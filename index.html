@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Bedrock Essentials</title>
+    <meta name="description" content="Stand der Welt, Karte, Handel, Clans, Nachrichten und Das Vermächtnis – direkt vom Server." />
+    <meta name="theme-color" content="#0f1115" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://*.supabase.co; base-uri 'none'; form-action 'self'" />
+    <meta name="referrer" content="no-referrer" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%235f9e3a'/%3E%3Crect y='10' width='16' height='6' fill='%23866043'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="config.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="side" id="side" aria-label="Navigation">
+        <a class="brand" href="#/overview">
+          <span class="block" aria-hidden="true"></span>
+          <span class="brand-text" id="brand-name"></span>
+        </a>
+        <nav class="nav" id="nav" aria-label="Seiten"></nav>
+        <div class="side-foot">
+          <button class="icon-btn" id="theme-toggle" type="button"></button>
+          <button class="icon-btn" id="lang-toggle" type="button">EN</button>
+        </div>
+      </aside>
+      <div class="scrim" id="scrim" hidden></div>
+
+      <div class="main">
+        <header class="top">
+          <button class="icon-btn only-mobile" id="menu-btn" type="button"></button>
+          <div class="title" id="page-title"></div>
+          <div class="top-right">
+            <span class="status-line" id="status-line"></span>
+            <span class="pill" id="status-pill">…</span>
+            <a class="account-chip" id="account-chip" href="#/profile"></a>
+          </div>
+        </header>
+        <p class="banner" id="banner" hidden></p>
+
+        <main>
+          <div id="page-overview"></div>
+
+          <div id="page-map" hidden>
+            <section class="card wide map-card">
+              <div class="card-head">
+                <div class="map-tools" id="map-tools"></div>
+                <span class="muted" id="map-info"></span>
+              </div>
+              <div class="map-wrap">
+                <canvas id="map" aria-label="Karte"></canvas>
+                <p class="map-empty" id="map-empty" data-t="web.map.empty" hidden></p>
+                <span class="coords" id="map-coords"></span>
+              </div>
+              <p class="hint"><span data-t="web.map.hint"></span> <span id="map-players"></span></p>
+            </section>
+            <div id="map-wp" class="wide"></div>
+          </div>
+
+          <div id="page-info" hidden></div>
+          <div id="page-players" hidden></div>
+          <div id="page-legacy" hidden></div>
+          <div id="page-market" hidden></div>
+          <div id="page-clans" hidden></div>
+          <div id="page-bounties" hidden></div>
+          <div id="page-ranks" hidden></div>
+          <div id="page-messages" hidden></div>
+          <div id="page-profile" hidden></div>
+          <div id="page-admin" hidden></div>
+        </main>
+
+        <footer><span data-t="web.footer"></span></footer>
+      </div>
+
+      <nav class="tabbar" id="tabbar" aria-label="Schnellwahl"></nav>
+    </div>
+
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

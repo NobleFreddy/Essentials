@@ -1,0 +1,282 @@
+{
+ "v": 1,
+ "at": 1791624370400,
+ "online": [
+  {
+   "name": "Julia"
+  },
+  {
+   "name": "Ben"
+  },
+  {
+   "name": "Mara"
+  },
+  {
+   "name": "Ida"
+  }
+ ],
+ "legacy": {
+  "enabled": true,
+  "running": true,
+  "cycle": 1,
+  "day": 4,
+  "phase": "running",
+  "stormLeft": 0,
+  "progress": 11,
+  "tasks": [
+   {
+    "id": "nethergate",
+    "chain": 2,
+    "progress": 3,
+    "target": 5,
+    "done": false
+   },
+   {
+    "id": "eyeofend",
+    "chain": 3,
+    "progress": 3,
+    "target": 12,
+    "done": false
+   },
+   {
+    "id": "beasthunt",
+    "chain": 3,
+    "progress": 21,
+    "target": 60,
+    "done": false
+   },
+   {
+    "id": "copperworks",
+    "chain": 2,
+    "progress": 0,
+    "target": 512,
+    "done": false
+   }
+  ],
+  "done": 1,
+  "vote": {
+   "open": true,
+   "kind": "normal",
+   "endsAt": 1791624550400
+  },
+  "emergencyLeft": 3,
+  "players": 8
+ },
+ "gates": {
+  "on": true,
+  "hours": 222,
+  "nether": {
+   "open": true,
+   "left": 0,
+   "need": 100,
+   "mode": "auto"
+  },
+  "end": {
+   "open": false,
+   "left": 78,
+   "need": 300,
+   "mode": "auto"
+  }
+ },
+ "news": [
+  {
+   "at": 1791505570399,
+   "msg": {
+    "rawtext": [
+     {
+      "text": "§6[Vermächtnis]§r "
+     },
+     {
+      "rawtext": [
+       {
+        "translate": "legacy.msg.task_done"
+       },
+       {
+        "text": " §e"
+       },
+       {
+        "translate": "legacy.task.abyss"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "at": 1791525370399,
+   "msg": {
+    "rawtext": [
+     {
+      "text": "§6[Vermächtnis]§r "
+     },
+     {
+      "translate": "legacy.msg.day",
+      "with": {
+       "rawtext": [
+        {
+         "text": "2"
+        },
+        {
+         "text": "1"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "at": 1791545170399,
+   "msg": {
+    "rawtext": [
+     {
+      "text": "§6[Vermächtnis]§r "
+     },
+     {
+      "translate": "legacy.msg.vote_skipped",
+      "with": {
+       "rawtext": [
+        {
+         "text": "4"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "at": 1791564970399,
+   "msg": {
+    "rawtext": [
+     {
+      "text": "§6[Vermächtnis]§r "
+     },
+     {
+      "translate": "legacy.msg.day",
+      "with": {
+       "rawtext": [
+        {
+         "text": "3"
+        },
+        {
+         "text": "1"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "at": 1791584770399,
+   "msg": {
+    "rawtext": [
+     {
+      "text": "§6[Vermächtnis]§r "
+     },
+     {
+      "translate": "legacy.msg.timeout",
+      "with": {
+       "rawtext": [
+        {
+         "text": "Finn"
+        },
+        {
+         "text": "4"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "at": 1791604570399,
+   "msg": {
+    "rawtext": [
+     {
+      "text": "§6[Vermächtnis]§r "
+     },
+     {
+      "translate": "legacy.msg.day",
+      "with": {
+       "rawtext": [
+        {
+         "text": "4"
+        },
+        {
+         "text": "1"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "at": 1791624370400,
+   "msg": {
+    "rawtext": [
+     {
+      "text": "§6[Vermächtnis]§r "
+     },
+     {
+      "translate": "legacy.msg.vote_open",
+      "with": {
+       "rawtext": [
+        {
+         "text": "3 min"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "top": [
+  {
+   "name": "Finn",
+   "value": 18
+  },
+  {
+   "name": "Tom",
+   "value": 4
+  },
+  {
+   "name": "Mara",
+   "value": 3
+  },
+  {
+   "name": "Julia",
+   "value": 2
+  },
+  {
+   "name": "Ben",
+   "value": 2
+  },
+  {
+   "name": "Lea",
+   "value": 2
+  },
+  {
+   "name": "Ida",
+   "value": 1
+  }
+ ],
+ "market": [],
+ "clans": [],
+ "bounties": [],
+ "stats": {
+  "playtimeMin": [],
+  "blocksBroken": [],
+  "blocksPlaced": [],
+  "mobKills": [],
+  "playerKills": [],
+  "deaths": [],
+  "distance": [],
+  "trades": [],
+  "bounties": []
+ }
+}
