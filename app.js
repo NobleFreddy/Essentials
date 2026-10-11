@@ -454,9 +454,11 @@ async function start() {
   // Lokal oft; ueber Supabase sparsam (die Aufrufe zaehlen gegen ein kostenloses Kontingent,
   // das sich die Seite mit einem anderen Projekt teilt) - und gar nicht, solange der Tab im
   // Hintergrund ist. Kommt er nach vorn, wird sofort nachgeholt.
+  // Angemeldet alle 15 s - so oft meldet sich der Server bei Supabase
   const fast = state.mode === "local";
   const visibleOnly = (fn) => () => fast || !document.hidden ? fn() : undefined;
-  setInterval(visibleOnly(() => refresh()), fast ? 3000 : 30000);
+  let ticks = 0;
+  setInterval(visibleOnly(() => (fast || loggedIn() || ++ticks % 2 === 0) && refresh()), fast ? 3000 : 15000);
   setInterval(visibleOnly(refreshTiles), fast ? 3000 : 60000);
   setInterval(renderStatus, 5000);
   document.addEventListener("visibilitychange", () => {

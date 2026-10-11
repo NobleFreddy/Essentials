@@ -7,6 +7,48 @@
  * Lampe im Nordwesten, und Wasser wird mit der Tiefe dunkler.
  */
 import { decodeTile, fallbackColor } from "./shared/mapscan.js";
+import { TINTED, BASE, biomeTint } from "./shared/tints.js";
+
+// ---------------------------------------------------------------- Texturen
+/**
+ * Nah herangezoomt (ab TEXTURE_SCALE Bildpunkten je Block) zeigt die Karte die echten
+ * Block-Texturen (shared/blocks.png, aus tools/gen-block-atlas.mjs) - mit derselben
+ * Biom-Faerbung und demselben Relief wie die Farben. Der Atlas wird erst dann geladen.
+ */
+export const TEXTURE_SCALE = 6;
+/** So viele Stuecke mit Textur bleiben im Speicher (je 256 x 256 Pixel). */
+const TEXTURE_CACHE = 320;
+/** So viele werden je Bild neu gezeichnet - der Rest folgt im naechsten, die Karte ruckelt nicht. */
+const TEXTURE_PER_FRAME = 24;
+/** Mittleres Grau der Biom-Texturen: so hell wie in der Farbansicht (siehe gen-map-colors.mjs). */
+export const GREY = 150;
+let atlas;
+let atlasLoading;
+function loadAtlas(onReady) {
+  if (atlas || atlasLoading) return;
+  atlasLoading = (async () => {
+    try {
+      const [info, img] = await Promise.all([
+        fetch("shared/blocks.json", { cache: "force-cache" }).then((r) => r.json()),
+        new Promise((resolve, reject) => {
+          const i = new Image();
+          i.onload = () => resolve(i);
+          i.onerror = reject;
+          i.src = "shared/blocks.png";
+        }),
+      ]);
+      const c = document.createElement("canvas");
+      c.width = img.width;
+      c.height = img.height;
+      const g = c.getContext("2d", { willReadFrequently: true });
+      g.drawImage(img, 0, 0);
+      atlas = { ...info, width: img.width, px: g.getImageData(0, 0, img.width, img.height).data };
+      onReady?.();
+    } catch {
+      /* ohne Texturen - die Farben reichen */
+    }
+  })();
+}
 
 // ---------------------------------------------------------------- Farben
 let table = {};
@@ -46,38 +88,6 @@ export function blockRgb(id) {
     rgbCache.set(id, rgb);
   }
   return rgb;
-}
-
-// Biom-Faerbung: die Tabelle ist mit Ebenen-Gras, Wald-Laub und Ozean-Wasser gerechnet
-const BASE = { grass: [145, 189, 89], foliage: [119, 171, 47], water: [63, 118, 228] };
-const BIOMES = [
-  [/badlands|mesa/, { grass: [144, 129, 77], foliage: [158, 129, 77] }],
-  [/desert|savanna/, { grass: [191, 183, 85], foliage: [174, 164, 42] }],
-  [/mangrove/, { grass: [106, 112, 57], foliage: [141, 177, 39], water: [58, 122, 106] }],
-  [/swamp/, { grass: [106, 112, 57], foliage: [106, 112, 57], water: [97, 123, 100] }],
-  [/jungle/, { grass: [89, 201, 60], foliage: [48, 187, 11] }],
-  [/cherry/, { grass: [182, 219, 97], foliage: [182, 219, 97] }],
-  [/dark_forest|roofed/, { grass: [80, 122, 50], foliage: [89, 174, 48] }],
-  [/birch/, { grass: [136, 187, 103], foliage: [107, 169, 65] }],
-  [/snowy|frozen|ice|grove|peaks/, { grass: [128, 180, 151], foliage: [96, 161, 123] }],
-  [/taiga|old_growth/, { grass: [134, 183, 131], foliage: [104, 164, 100] }],
-  [/meadow/, { grass: [131, 187, 109], foliage: [99, 165, 80] }],
-  [/forest|flower/, { grass: [121, 192, 90], foliage: [89, 174, 48] }],
-];
-const OCEAN = [
-  [/warm/, [67, 213, 238]],
-  [/lukewarm/, [69, 173, 242]],
-  [/frozen/, [57, 56, 201]],
-  [/cold/, [61, 87, 214]],
-];
-const TINTED = { grass: /^(grass_block|short_grass|tall_grass|fern|large_fern|tallgrass|vine|sugar_cane|bush)$/, foliage: /^(oak|jungle|acacia|dark_oak|mangrove)_leaves$|^leaves2?$/, water: /^(flowing_)?water$/ };
-
-function biomeTint(kind, biome) {
-  if (kind === "water") {
-    const ocean = OCEAN.find(([re]) => re.test(biome));
-    if (ocean) return ocean[1];
-  }
-  return BIOMES.find(([re]) => re.test(biome))?.[1]?.[kind] ?? BASE[kind];
 }
 
 export function columnRgb(col) {
@@ -121,6 +131,11 @@ export function createMap(canvas, { onHover, onClick } = {}) {
     const north = tiles.get(key(cx, cz - 1));
     const west = tiles.get(key(cx - 1, cz));
     const img = new ImageData(16, 16);
+    // Je Block: Helligkeit (Relief) und ob die Nachbarn im Norden / Westen hoeher liegen -
+    // die Texturen bekommen dort eine Schattenkante
+    t.shade = new Float32Array(256);
+    t.edge = new Uint8Array(256);
+    t.tex = undefined;
     for (let z = 0; z < 16; z++) {
       for (let x = 0; x < 16; x++) {
         const col = t.cols[z * 16 + x];
@@ -133,7 +148,9 @@ export function createMap(canvas, { onHover, onClick } = {}) {
         } else {
           const delta = (n ? col.y - n.y : 0) + (w ? col.y - w.y : 0);
           f = 1 + Math.max(-0.32, Math.min(0.22, delta * 0.07));
+          t.edge[z * 16 + x] = (n && n.y > col.y && !n.depth ? 1 : 0) | (w && w.y > col.y && !w.depth ? 2 : 0);
         }
+        t.shade[z * 16 + x] = f;
         const [r, g, b] = columnRgb(col);
         const i = (z * 16 + x) * 4;
         img.data[i] = Math.min(255, r * f);
@@ -147,6 +164,83 @@ export function createMap(canvas, { onHover, onClick } = {}) {
     c.height = 16;
     c.getContext("2d").putImageData(img, 0, 0);
     t.image = c;
+    texCache.delete(t);
+  }
+
+  // Stuecke mit Textur: zuletzt benutzte zuletzt (Map behaelt die Reihenfolge)
+  const texCache = new Map();
+
+  /** Ein Kartenstueck mit Texturen zeichnen: 16 x 16 Bloecke zu je 16 x 16 Pixeln. */
+  function textureTile(t) {
+    const S = atlas.size;
+    const W = 16 * S;
+    const img = new ImageData(W, W);
+    const out = img.data;
+    for (let i = 0; i < 256; i++) {
+      const col = t.cols[i];
+      const id = col.id.replace(/^minecraft:/, "");
+      const f = t.shade[i];
+      const bx = (i % 16) * S;
+      const bz = Math.floor(i / 16) * S;
+      const cell = id === "air" ? undefined : atlas.ids[id];
+      // Unbekannter Block (fremdes Addon): seine Farbe, leicht gemasert
+      const flat = cell === undefined ? columnRgb(col) : undefined;
+      const kind = cell !== undefined ? atlas.tint[cell] : undefined;
+      const tint = kind ? biomeTint(kind, col.biome) : undefined;
+      const sx = cell !== undefined ? (cell % atlas.cols) * S : 0;
+      const sy = cell !== undefined ? Math.floor(cell / atlas.cols) * S : 0;
+      const edge = t.edge[i];
+      for (let py = 0; py < S; py++) {
+        for (let px = 0; px < S; px++) {
+          const o = ((bz + py) * W + bx + px) * 4;
+          if (id === "air") continue;
+          let r;
+          let g;
+          let b;
+          if (flat) {
+            const n = ((px * 7 + py * 13) % 5) * 0.02 + 0.96;
+            [r, g, b] = [flat[0] * n, flat[1] * n, flat[2] * n];
+          } else {
+            const a = ((sy + py) * atlas.width + sx + px) * 4;
+            r = atlas.px[a];
+            g = atlas.px[a + 1];
+            b = atlas.px[a + 2];
+            if (tint) {
+              r = (r * tint[0]) / GREY;
+              g = (g * tint[1]) / GREY;
+              b = (b * tint[2]) / GREY;
+            }
+          }
+          // Schattenkante, wo der Nachbar hoeher liegt
+          const k = f * ((edge & 1 && py === 0) || (edge & 2 && px === 0) ? 0.72 : 1);
+          out[o] = Math.min(255, r * k);
+          out[o + 1] = Math.min(255, g * k);
+          out[o + 2] = Math.min(255, b * k);
+          out[o + 3] = 255;
+        }
+      }
+    }
+    const c = document.createElement("canvas");
+    c.width = W;
+    c.height = W;
+    c.getContext("2d").putImageData(img, 0, 0);
+    return c;
+  }
+
+  /** Die Textur-Fassung eines Stuecks - aus dem Speicher, neu (wenn das Budget reicht) oder keine. */
+  function texturedImage(t, budget) {
+    let c = texCache.get(t);
+    if (c) {
+      texCache.delete(t);
+      texCache.set(t, c);
+      return c;
+    }
+    if (budget.left <= 0) return undefined;
+    budget.left--;
+    c = textureTile(t);
+    texCache.set(t, c);
+    while (texCache.size > TEXTURE_CACHE) texCache.delete(texCache.keys().next().value);
+    return c;
   }
 
   /** Neue oder geaenderte Kartenstuecke uebernehmen. */
@@ -211,6 +305,9 @@ export function createMap(canvas, { onHover, onClick } = {}) {
     const cx1 = Math.ceil((left + w / s) / 16);
     const cz1 = Math.ceil((top + h / s) / 16);
     const tiles = tilesOf();
+    const textured = view.scale >= TEXTURE_SCALE;
+    if (textured && !atlas) loadAtlas(() => (dirty = true));
+    const budget = { left: TEXTURE_PER_FRAME };
     for (let cz = cz0; cz <= cz1; cz++) {
       for (let cx = cx0; cx <= cx1; cx++) {
         const t = tiles.get(key(cx, cz));
@@ -218,9 +315,14 @@ export function createMap(canvas, { onHover, onClick } = {}) {
         const px = Math.floor((cx * 16 - left) * s);
         const pz = Math.floor((cz * 16 - top) * s);
         const size = Math.ceil(16 * s);
-        ctx.drawImage(t.image, px, pz, size, size);
+        const tex = textured && atlas ? texturedImage(t, budget) : undefined;
+        // Verkleinerte Texturen glaetten (sonst flimmern sie), vergroesserte Bloecke scharf lassen
+        ctx.imageSmoothingEnabled = !!tex && size < tex.width;
+        ctx.drawImage(tex ?? t.image, px, pz, size, size);
       }
     }
+    // Noch nicht alle Texturen fertig - im naechsten Bild weiter
+    if (textured && atlas && budget.left <= 0) dirty = true;
     if (grid && view.scale >= 2) {
       ctx.strokeStyle = "rgba(0,0,0,0.25)";
       ctx.lineWidth = 1;

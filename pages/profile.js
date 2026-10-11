@@ -130,7 +130,7 @@ let profileTab = "overview";
 let deviceList; // zuletzt geholte Sitzungen
 
 export function renderProfile() {
-  if (state.mode !== "local") return $("page-profile").replaceChildren(card(t("web.login"), "key", empty("web.login.local_only")));
+  if (state.mode === "demo") return $("page-profile").replaceChildren(card(t("web.login"), "key", empty("web.login.local_only")));
   if (!loggedIn()) return $("page-profile").replaceChildren(loginCard());
   const me = state.me;
   const b = B();

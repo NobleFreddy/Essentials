@@ -46,6 +46,48 @@ function depthBelow(dimension, x, y, z) {
   }
 }
 
+const isLiquid = (block) => {
+  try {
+    return !!block && (block.isLiquid === true || WATERY.test(block.typeId));
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Die Wasser- (oder Lava-)Oberflaeche ueber dem Grund. getTopmostBlock uebergeht
+ * Fluessigkeiten und liefert den Meeresboden - ohne das hier gaebe es auf der Karte kein Wasser.
+ * Erst ein Blick auf den Block darueber (billig); nur wenn dort Wasser ist, ein Strahl von
+ * oben, der Fluessigkeiten trifft - sein erster Treffer ist die Oberflaeche.
+ * @returns {object|undefined} der oberste Fluessigkeitsblock
+ */
+function liquidAbove(dimension, x, y, z, topY) {
+  let above;
+  try {
+    above = dimension.getBlock?.({ x, y: y + 1, z });
+  } catch {
+    return undefined;
+  }
+  if (!isLiquid(above)) return undefined;
+  try {
+    const hit = dimension.getBlockFromRay?.({ x: x + 0.5, y: topY, z: z + 0.5 }, { x: 0, y: -1, z: 0 }, { includeLiquidBlocks: true, includePassableBlocks: true, maxDistance: topY - y });
+    if (hit?.block && isLiquid(hit.block) && hit.block.location.y > y) return hit.block;
+  } catch {
+    /* Strahl ging nicht - dann wenigstens Wasser, einen Block tief */
+  }
+  return above;
+}
+
+/** Bis wohin von oben gesucht wird. */
+function topOf(dimension, startY) {
+  if (startY !== undefined) return startY;
+  try {
+    return Number(dimension.heightRange?.max) || 320;
+  } catch {
+    return 320;
+  }
+}
+
 /**
  * Einen Chunk auslesen.
  * @param {{startY?:number}} [opt]  startY: von dieser Hoehe aus nach unten suchen (Nether)
@@ -65,6 +107,7 @@ export function scanChunk(dimension, cx, cz, opt = {}) {
   const biomeIndex = new Map();
   const cellBiome = new Map();
   const bytes = new Array(256 * BYTES_PER_COLUMN);
+  const topY = topOf(dimension, opt.startY);
   for (let z = 0; z < 16; z++) {
     for (let x = 0; x < 16; x++) {
       let block;
@@ -73,6 +116,16 @@ export function scanChunk(dimension, cx, cz, opt = {}) {
       } catch {
         return undefined; // mitten im Lesen entladen - beim naechsten Mal
       }
+      // Wasser ueber dem Grund: die Oberflaeche zeigen, die Tiefe bis zum Grund merken
+      let depth = 0;
+      if (block && !isLiquid(block)) {
+        const floorY = Number(block.location?.y ?? block.y) || 0;
+        const surface = liquidAbove(dimension, x0 + x, floorY, z0 + z, topY);
+        if (surface) {
+          depth = Math.max(1, Math.min(255, Number(surface.location?.y ?? floorY + 1) - floorY));
+          block = surface;
+        }
+      } else if (block) depth = depthBelow(dimension, x0 + x, Number(block.location?.y ?? block.y) || 0, z0 + z);
       const id = block ? shortId(block.typeId) : "air";
       if (!index.has(id)) {
         index.set(id, palette.length);
@@ -93,7 +146,7 @@ export function scanChunk(dimension, cx, cz, opt = {}) {
       bytes[o] = index.get(id) & 255;
       bytes[o + 1] = h & 255;
       bytes[o + 2] = (h >> 8) & 255;
-      bytes[o + 3] = block && WATERY.test(block.typeId) ? depthBelow(dimension, x0 + x, y, z0 + z) : 0;
+      bytes[o + 3] = depth;
       bytes[o + 4] = cellBiome.get(cell) & 255;
     }
   }

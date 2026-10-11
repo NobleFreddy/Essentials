@@ -3,7 +3,8 @@
  *
  * Datenquellen (pickMode):
  *   local     der lokale Server (tools/local-server.mjs) - alles, auch Anmeldung und Aktionen
- *   supabase  nur Anzeige (Stufe 1) - fuer GitHub Pages, gelesen ueber die Edge Function
+ *   supabase  fuer GitHub Pages: alles ueber die Edge Function "essentials-web" - Anzeige ohne,
+ *             Anmeldung und Aktionen mit Zugangsschluessel (dieselben Wege wie lokal)
  *   demo      Beispieldaten
  */
 export const cfg = window.BE_CONFIG ?? {};
@@ -80,17 +81,24 @@ export async function getJson(url, opts = {}) {
   return r.json();
 }
 
-const token = () => stored("be-token");
-export const loggedIn = () => !!token() && state.mode === "local";
-const authHeaders = () => (token() ? { Authorization: "Bearer " + token() } : {});
+// Der Zugangsschluessel gilt nur fuer die Quelle, bei der man sich angemeldet hat
+const tokenKey = () => (state.mode === "supabase" ? "be-token-sb" : "be-token");
+const token = () => stored(tokenKey());
+const setToken = (v) => store(tokenKey(), v);
+export const loggedIn = () => !!token() && (state.mode === "local" || state.mode === "supabase");
+// Eigener Header statt Authorization: den wertet das Supabase-Gateway nicht als JWT aus
+const authHeaders = () => (token() ? { "x-be-token": token() } : {});
 
-async function post(url, body) {
-  return getJson(url, { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(body ?? {}) });
-}
-
-// Supabase (nur Anzeige): ueber die Edge Function "essentials-web" - ohne Schluessel, die Daten
+// Supabase: ueber die Edge Function "essentials-web" - ohne Supabase-Schluessel, die Daten
 // liegen in einem eigenen Schema, das die REST-API nicht freigibt
-const fnUrl = (query) => cfg.supabaseUrl.replace(/\/+$/, "") + "/functions/v1/" + (cfg.webFunction || "essentials-web") + "?" + query;
+const fnBase = () => cfg.supabaseUrl.replace(/\/+$/, "") + "/functions/v1/" + (cfg.webFunction || "essentials-web");
+const fnUrl = (query) => fnBase() + "?" + query;
+/** Adresse eines Wegs der Anmeldung - lokal relativ, sonst bei der Edge Function. */
+export const api = (route) => (state.mode === "supabase" ? fnBase() + "/api/" : "api/") + route;
+
+async function post(route, body) {
+  return getJson(api(route), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(body ?? {}) });
+}
 const PAGE = 2000;
 
 const SOURCES = {
@@ -158,37 +166,37 @@ export function device() {
 
 /** Mit /link-Code (erstes Mal, Passwort vergessen). */
 export async function login(code) {
-  const out = await post("api/login", { code, ...device() });
-  store("be-token", out.token);
+  const out = await post("login", { code, ...device() });
+  setToken(out.token);
   return out;
 }
 
 /** Mit Spielername und Passwort - code nur, wenn der Server ihn fuer ein neues Geraet verlangt. */
 export async function loginPassword(name, password, code) {
-  const out = await post("api/login", { name, password, ...(code ? { code } : {}), ...device() });
-  store("be-token", out.token);
+  const out = await post("login", { name, password, ...(code ? { code } : {}), ...device() });
+  setToken(out.token);
   return out;
 }
 
-export const setPassword = (password, old) => post("api/password", { password, ...(old ? { old } : {}) });
-export const setAccount = (values) => post("api/account", values);
-export const sessions = () => getJson("api/sessions", { headers: authHeaders() });
-export const revokeSession = (args) => post("api/sessions", args);
+export const setPassword = (password, old) => post("password", { password, ...(old ? { old } : {}) });
+export const setAccount = (values) => post("account", values);
+export const sessions = () => getJson(api("sessions"), { headers: authHeaders() });
+export const revokeSession = (args) => post("sessions", args);
 
 /** Konto ganz loesen: im Spiel nicht mehr verknuepft, Passwort weg. */
 export async function unlinkAccount() {
-  await post("api/account/unlink", {});
-  store("be-token", null);
+  await post("account/unlink", {});
+  setToken(null);
   state.me = null;
 }
 
 export async function logout(everywhere = false) {
   try {
-    await post("api/logout", { everywhere });
+    await post("logout", { everywhere });
   } catch {
     /* ohnehin weg */
   }
-  store("be-token", null);
+  setToken(null);
   state.me = null;
 }
 
@@ -196,10 +204,10 @@ export async function logout(everywhere = false) {
 export async function refreshMe() {
   if (!loggedIn()) return (state.me = null);
   try {
-    state.me = await getJson("api/me", { headers: authHeaders() });
+    state.me = await getJson(api("me"), { headers: authHeaders() });
   } catch (err) {
     if (err.status === 401) {
-      store("be-token", null);
+      setToken(null);
       state.me = null;
     }
   }
@@ -212,15 +220,17 @@ export async function refreshMe() {
  * onState(state) wird bei jedem Wechsel gerufen: waiting, sent, queued, done, failed.
  */
 export async function command(type, args, onState = () => {}) {
-  const { id } = await post("api/cmd", { type, args });
+  const { id } = await post("cmd", { type, args });
   onState({ state: "waiting" });
   const started = Date.now();
   let last = "waiting";
-  while (Date.now() - started < 90000) {
-    await new Promise((r) => setTimeout(r, 1200));
+  // Ueber Supabase meldet sich der Server nur alle 15 s - seltener fragen, laenger warten
+  const remote = state.mode === "supabase";
+  while (Date.now() - started < (remote ? 120000 : 90000)) {
+    await new Promise((r) => setTimeout(r, remote ? 3000 : 1200));
     let s;
     try {
-      s = await getJson("api/cmd?id=" + encodeURIComponent(id), { headers: authHeaders() });
+      s = await getJson(api("cmd?id=" + encodeURIComponent(id)), { headers: authHeaders() });
     } catch {
       continue;
     }

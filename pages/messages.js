@@ -29,7 +29,7 @@ export function threads(messages) {
 
 export function renderMessages() {
   const page = $("page-messages");
-  if (state.mode !== "local") return page.replaceChildren(el("section", "card", head(t("web.nav.messages"), "messages"), empty("web.login.local_only")));
+  if (state.mode === "demo") return page.replaceChildren(el("section", "card", head(t("web.nav.messages"), "messages"), empty("web.login.local_only")));
   if (!loggedIn()) return page.replaceChildren(el("section", "card narrow cta", el("p", "", t("web.msg.login")), button(t("web.nav.login"), () => go("profile"), "primary", "key")));
   const b = B();
   if (!b) return page.replaceChildren(el("section", "card", el("p", "muted", t("web.profile.waiting"))));
