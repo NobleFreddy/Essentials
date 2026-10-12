@@ -1925,3 +1925,347 @@ dialog.dlg .actions {
   border-color: var(--danger);
   background: linear-gradient(var(--danger-soft), var(--danger-soft)), var(--panel);
 }
+
+/* ---------------------------------------------------------------- Server-Guide */
+#page-guide {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+  align-items: start;
+}
+.guide-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.guide-hero h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.35rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+}
+.guide-hero p {
+  max-width: 78ch;
+}
+.guide-pillars,
+.guide-addons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: 1.25rem;
+}
+.pillar p {
+  margin: 0 0 0.6rem;
+}
+.addon-card {
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.addon-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+.addon-card p {
+  margin: 0;
+}
+.path {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: path;
+}
+.path li {
+  position: relative;
+  padding-left: 2.6rem;
+  counter-increment: path;
+}
+.path li::before {
+  content: counter(path);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1.8rem;
+  height: 1.8rem;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+.path li p {
+  margin: 0.2rem 0 0;
+}
+dl.keys,
+dl.features,
+dl.stats,
+dl.structures {
+  display: grid;
+  grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
+  gap: 0.45rem 1rem;
+  margin: 0;
+}
+dl.keys dt,
+dl.features dt,
+dl.stats dt,
+dl.structures dt {
+  font-weight: 600;
+}
+dl.keys dd,
+dl.features dd,
+dl.stats dd,
+dl.structures dd {
+  margin: 0;
+  color: var(--muted);
+}
+dl.stats {
+  grid-template-columns: max-content 1fr;
+}
+.rule h3 {
+  margin: 0 0 0.5rem;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 1.05rem;
+}
+.rule ul,
+ul.tips {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.4rem;
+}
+.callout {
+  margin: 0.6rem 0 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--panel-2);
+}
+.callout.bad {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+.wiki {
+  display: grid;
+  gap: 0.35rem;
+}
+.wiki details {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.8rem;
+  background: var(--panel-2);
+}
+.wiki summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.wiki details p {
+  margin: 0.5rem 0 0.2rem;
+  white-space: pre-line;
+  color: var(--muted);
+}
+.table-wrap {
+  overflow-x: auto;
+}
+.table-wrap.tall {
+  max-height: 560px;
+  overflow-y: auto;
+}
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+table.data th {
+  position: sticky;
+  top: 0;
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  background: var(--panel-solid);
+  color: var(--muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--line-strong);
+}
+table.data td {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+small.sub {
+  display: block;
+  margin-top: 0.15rem;
+  max-width: 60ch;
+}
+.ore {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.ico.gico {
+  background-image: url("guide/icons.png");
+}
+.grid-card > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.grid-card > summary h2 {
+  display: inline;
+}
+.grid-card > summary::-webkit-details-marker {
+  display: none;
+}
+.grid-card > summary::before {
+  content: "▸ ";
+  color: var(--muted);
+}
+.grid-card[open] > summary::before {
+  content: "▾ ";
+}
+.grid-card .toolbar {
+  margin: 0.8rem 0;
+}
+.igrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.4rem;
+}
+.itile {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: inherit;
+  font: inherit;
+  font-size: 0.86rem;
+  text-align: left;
+  cursor: pointer;
+}
+.itile:hover {
+  border-color: var(--accent);
+}
+.itile span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.slot {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel-3);
+  color: inherit;
+  cursor: pointer;
+}
+.slot.empty {
+  cursor: default;
+  opacity: 0.45;
+}
+.slot:disabled {
+  cursor: default;
+}
+.slot .cnt {
+  position: absolute;
+  right: 2px;
+  bottom: 0;
+  font-size: 0.75rem;
+  text-shadow: 0 1px 2px #000;
+}
+.loot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.loot .slot {
+  min-width: 34px;
+  min-height: 34px;
+}
+.recipes {
+  display: grid;
+  gap: 0.8rem;
+}
+.recipe {
+  display: grid;
+  gap: 0.3rem;
+}
+.rbody {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+.rgrid {
+  display: grid;
+  gap: 4px;
+}
+.rrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.arrow {
+  font-size: 1.4rem;
+  color: var(--muted);
+}
+dialog.guide-dlg {
+  width: min(640px, calc(100vw - 32px));
+}
+dialog.guide-dlg .close {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+}
+.item-detail {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1.3rem 1.4rem;
+}
+.item-head {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding-right: 2.5rem;
+}
+.item-head h3 {
+  margin: 0;
+}
+.item-head p,
+.item-detail > p {
+  margin: 0;
+}
+.item-detail h4 {
+  margin: 0.4rem 0 0;
+}
+@media (max-width: 640px) {
+  dl.keys,
+  dl.features,
+  dl.structures {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .igrid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  }
+}
+a.chip {
+  text-decoration: none;
+}
+dl.features {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.15rem;
+}
+dl.features dd {
+  margin-bottom: 0.55rem;
+}

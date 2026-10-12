@@ -22,6 +22,7 @@ import { renderAdmin } from "./pages/admin.js";
 import { renderPlayers } from "./pages/players.js";
 import { renderMessages } from "./pages/messages.js";
 import { renderInfo } from "./pages/info.js";
+import { renderGuide } from "./pages/guide.js";
 import { allWaypoints, newWaypoint, showWaypoint, waypointList } from "./pages/waypoints.js";
 
 /** [ID, Uebersetzungsschluessel] aller bekannten Items - fuer die Suche nach Namen. */
@@ -29,7 +30,7 @@ export let ITEM_IDS = [];
 
 const OFFLINE_AFTER_MS = 90000;
 const GROUPS = [
-  ["web.group.world", [["overview", "home"], ["map", "map"], ["legacy", "legacy"], ["info", "info"]]],
+  ["web.group.world", [["overview", "home"], ["guide", "book"], ["map", "map"], ["legacy", "legacy"], ["info", "info"]]],
   ["web.group.community", [["players", "players"], ["clans", "clans"], ["ranks", "ranks"]]],
   ["web.group.trade", [["market", "market"], ["bounties", "bounties"]]],
   ["web.group.me", [["messages", "messages"], ["profile", "profile"]]],
@@ -42,6 +43,7 @@ const RENDER = {
   overview: renderOverview,
   map: renderMapPage,
   info: renderInfo,
+  guide: renderGuide,
   players: renderPlayers,
   legacy: renderLegacy,
   market: renderMarket,
