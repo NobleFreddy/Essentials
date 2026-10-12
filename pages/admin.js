@@ -2,10 +2,10 @@
  * Admin (nur Operatoren): Spieler - auch offline -, Welt, Einstellungen (Module, Spielregeln,
  * Karte), Web-Zugaenge und das Protokoll. Jede Aktion prueft das Addon noch einmal.
  */
-import { state, t } from "../core.js";
-import { el, $, ago, empty, button, act, dialog, confirmDialog, tabs, head, avatar } from "../ui.js";
+import { state, t, resetWebsite, reasonText } from "../core.js";
+import { el, $, ago, empty, button, act, dialog, confirmDialog, tabs, head, avatar, toast } from "../ui.js";
 import { plain, fill } from "../rawtext.js";
-import { refresh, go } from "../app.js";
+import { refresh, go, clearMapView } from "../app.js";
 import { playerNames } from "./public.js";
 
 const B = () => state.me?.bundle ?? null;
@@ -210,7 +210,39 @@ function webTab(a) {
         : button(t("web.admin.web.revoke"), async () => (await confirmDialog(t("web.admin.web.revoke"), t("web.admin.web.revoke.confirm", plain(l.name)), t("web.admin.web.revoke"), true)) && act("admin.unlink", { name: l.name }, { after: refresh }), "danger small")
     );
   });
-  return [el("section", "card wide", head(t("web.admin.web"), "key"), el("p", "muted small", t("web.admin.web.text")), rows.length ? el("ul", "members", ...rows) : empty("web.admin.web.none"))];
+  return [el("section", "card wide", head(t("web.admin.web"), "key"), el("p", "muted small", t("web.admin.web.text")), rows.length ? el("ul", "members", ...rows) : empty("web.admin.web.none")), resetCard()];
+}
+
+// ---------------------------------------------------------------- Webseite zuruecksetzen
+/** Zur Sicherheit muss man dieses Wort eintippen. */
+export const RESET_WORD = "RESET";
+
+function resetCard() {
+  return el("section", "card wide danger-zone", head(t("web.admin.reset"), "close"), el("p", "muted small", t("web.admin.reset.text")), el("div", "actions", button(t("web.admin.reset.go"), resetDialog, "danger small")));
+}
+
+async function resetDialog() {
+  const v = await dialog({
+    title: t("web.admin.reset"),
+    text: t("web.admin.reset.confirm"),
+    danger: true,
+    ok: t("web.admin.reset.go"),
+    fields: [
+      { name: "map", type: "checkbox", label: t("web.admin.reset.map"), value: true },
+      { name: "accounts", type: "checkbox", label: t("web.admin.reset.accounts"), value: true },
+      { name: "word", label: t("web.admin.reset.word", RESET_WORD), maxlength: 20 },
+    ],
+  });
+  if (!v) return;
+  if (String(v.word).trim().toUpperCase() !== RESET_WORD) return toast(t("web.admin.reset.wrong", RESET_WORD), "bad");
+  try {
+    await resetWebsite({ map: v.map, accounts: v.accounts });
+    if (v.map) clearMapView();
+    toast(t("web.admin.reset.done"), "good");
+  } catch (err) {
+    toast(reasonText("admin.reset", err.body?.reason), "bad");
+  }
+  await refresh(true);
 }
 
 function logTab(a) {

@@ -339,6 +339,13 @@ function otherSide(x, z) {
   return "";
 }
 
+/** Nach dem Zuruecksetzen: die Karte im Browser leeren und von vorn laden. */
+export function clearMapView() {
+  for (const k of Object.keys(since)) delete since[k];
+  map?.clear();
+  state.snap = null;
+}
+
 async function refreshTiles() {
   const dim = map.dimension;
   try {
@@ -377,6 +384,8 @@ const signature = () => JSON.stringify([state.snap?.data && { ...state.snap.data
  */
 export async function refresh(force = false) {
   await Promise.all([refreshSnapshot(), refreshMe()]);
+  // Die Verwaltung gibt es erst, wenn das eigene Paket da ist - stand sie in der Adresse, jetzt hin
+  if (currentPage() !== page && visible(currentPage())) show();
   applyMapData();
   renderStatus();
   renderBanner();

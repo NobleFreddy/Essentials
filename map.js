@@ -525,5 +525,12 @@ export function createMap(canvas, { onHover, onClick } = {}) {
     size(d = dim) {
       return tilesOf(d).size;
     },
+    /** Alle Kartenstuecke vergessen (nach dem Zuruecksetzen der Webseite). */
+    clear() {
+      dims.clear();
+      texCache.clear();
+      fitted.clear();
+      dirty = true;
+    },
   };
 }

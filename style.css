@@ -1919,3 +1919,9 @@ dialog.dlg .actions {
     animation: none !important;
   }
 }
+
+/* Webseite zuruecksetzen - deutlich abgesetzt */
+.card.danger-zone {
+  border-color: var(--danger);
+  background: linear-gradient(var(--danger-soft), var(--danger-soft)), var(--panel);
+}

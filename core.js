@@ -182,6 +182,8 @@ export const setPassword = (password, old) => post("password", { password, ...(o
 export const setAccount = (values) => post("account", values);
 export const sessions = () => getJson(api("sessions"), { headers: authHeaders() });
 export const revokeSession = (args) => post("sessions", args);
+/** Die Webseite zuruecksetzen (nur Operatoren) - im Spiel aendert sich nichts. */
+export const resetWebsite = (opts) => post("admin/reset", opts);
 
 /** Konto ganz loesen: im Spiel nicht mehr verknuepft, Passwort weg. */
 export async function unlinkAccount() {
