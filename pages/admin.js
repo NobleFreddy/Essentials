@@ -89,15 +89,15 @@ function playersTab(a, all) {
         el(
           "span",
           "actions",
-          button(t("web.admin.warn"), () => adminReason("admin.warn", p.name, t("web.admin.warn")), "ghost small"),
-          p.ban ? button(t("web.admin.unban"), () => act("admin.unban", { name: p.name }, { after: refresh }), "ghost small") : button(t("web.admin.ban"), () => banDialog(p.name), "danger small"),
+          button(t("web.admin.warn"), () => adminReason("admin.warn", p, t("web.admin.warn")), "ghost small"),
+          p.ban ? button(t("web.admin.unban"), () => act("admin.unban", who(p), { after: refresh }), "ghost small") : button(t("web.admin.ban"), () => banDialog(p.name, p.id), "danger small"),
           button(t("web.admin.more"), () => adminMenu(p), "ghost small", "settings")
         )
       )
     )
   );
   const bans = a.bans.length
-    ? el("ul", "members", ...a.bans.map((b) => el("li", "", el("span", "", plain(b.name), el("small", "muted", " " + (b.left < 0 ? "∞" : ago(b.left * 60000)) + " · " + plain(b.reason || "-"))), button(t("web.admin.unban"), () => act("admin.unban", { name: b.name }, { after: refresh }), "ghost small"))))
+    ? el("ul", "members", ...a.bans.map((b) => el("li", "", el("span", "", plain(b.name), el("small", "muted", " " + (b.left < 0 ? "∞" : ago(b.left * 60000)) + " · " + plain(b.reason || "-"))), button(t("web.admin.unban"), () => act("admin.unban", { name: b.name, id: b.id }, { after: refresh }), "ghost small"))))
     : empty("web.admin.bans.none");
   const pending = (a.pending ?? []).length
     ? el(
@@ -268,16 +268,16 @@ export async function adminMenu(p) {
     "div",
     "menu-list",
     ...item("✉ " + t("web.players.note"), () => go("messages", p.name)),
-    ...item("⚠ " + t("web.admin.warn"), () => adminReason("admin.warn", p.name, t("web.admin.warn"))),
-    ...(p.warns ? item("⚠ " + t("web.admin.unwarn", p.warns), () => act("admin.unwarn", { name: p.name }, { after: refresh })) : []),
-    ...item("❄ " + t(p.frozen ? "web.admin.unfreeze" : "web.admin.freeze"), () => act("admin.freeze", { name: p.name, on: !p.frozen }, { after: refresh }), "ghost", p.online || p.frozen ? "" : t("web.admin.freeze.hint")),
-    ...(p.online ? item("⏏ " + t("web.admin.kick"), () => adminReason("admin.kick", p.name, t("web.admin.kick")), "danger") : []),
-    ...(p.ban ? item("✓ " + t("web.admin.unban"), () => act("admin.unban", { name: p.name }, { after: refresh })) : item("⛔ " + t("web.admin.ban"), () => banDialog(p.name), "danger")),
-    ...item("❤ " + t("web.admin.heal"), () => act("admin.heal", { name: p.name }, later(p)), "ghost", offlineHint),
+    ...item("⚠ " + t("web.admin.warn"), () => adminReason("admin.warn", p, t("web.admin.warn"))),
+    ...(p.warns ? item("⚠ " + t("web.admin.unwarn", p.warns), () => act("admin.unwarn", who(p), { after: refresh })) : []),
+    ...item("❄ " + t(p.frozen ? "web.admin.unfreeze" : "web.admin.freeze"), () => act("admin.freeze", { ...who(p), on: !p.frozen }, { after: refresh }), "ghost", p.online || p.frozen ? "" : t("web.admin.freeze.hint")),
+    ...(p.online ? item("⏏ " + t("web.admin.kick"), () => adminReason("admin.kick", p, t("web.admin.kick")), "danger") : []),
+    ...(p.ban ? item("✓ " + t("web.admin.unban"), () => act("admin.unban", who(p), { after: refresh })) : item("⛔ " + t("web.admin.ban"), () => banDialog(p.name, p.id), "danger")),
+    ...item("❤ " + t("web.admin.heal"), () => act("admin.heal", who(p), later(p)), "ghost", offlineHint),
     ...item("◐ " + t("web.admin.mode"), () => modeDialog(p), "ghost", offlineHint),
-    ...item("🗑 " + t("web.admin.clearinv"), async () => (await confirmDialog(t("web.admin.clearinv"), t("web.admin.clearinv.confirm", plain(p.name)), t("web.admin.clearinv"), true)) && act("admin.clearinv", { name: p.name }, later(p)), "danger", offlineHint),
-    ...(p.legacy ? item("⌛ " + t("web.admin.ltimeout"), () => ltimeoutDialog(p.name)) : []),
-    ...(p.legacy && p.legacy !== "alive" ? item("☀ " + t("web.admin.lpardon"), () => act("admin.lpardon", { name: p.name }, { after: refresh })) : [])
+    ...item("🗑 " + t("web.admin.clearinv"), async () => (await confirmDialog(t("web.admin.clearinv"), t("web.admin.clearinv.confirm", plain(p.name)), t("web.admin.clearinv"), true)) && act("admin.clearinv", who(p), later(p)), "danger", offlineHint),
+    ...(p.legacy ? item("⌛ " + t("web.admin.ltimeout"), () => ltimeoutDialog(p.name, p.id)) : []),
+    ...(p.legacy && p.legacy !== "alive" ? item("☀ " + t("web.admin.lpardon"), () => act("admin.lpardon", who(p), { after: refresh })) : [])
   );
   await dialog({ title: plain(p.name), text: p.online ? t("web.players.online") : p.seen ? t("web.players.seen", ago(Date.now() - p.seen)) : "", body: box, ok: t("web.ok"), cancel: false });
 }
@@ -289,17 +289,26 @@ async function modeDialog(p) {
     fields: [{ name: "mode", label: t("web.admin.mode"), type: "select", options: ["survival", "creative", "adventure", "spectator"].map((m) => [m, t("web.admin.mode." + m)]), value: "survival" }],
     ok: t("web.admin.mode.set"),
   });
-  if (v) await act("admin.mode", { name: p.name, mode: v.mode }, later(p));
+  if (v) await act("admin.mode", { ...who(p), mode: v.mode }, later(p));
 }
 
 const knownNames = () => [...new Set([...(B()?.admin?.players ?? []).map((p) => p.name), ...playerNames()])];
 
-async function adminReason(type, name, title) {
-  const v = await dialog({ title: title + " · " + name, fields: [{ name: "reason", label: t("web.admin.reason"), maxlength: 120 }], ok: title, danger: type !== "admin.warn" });
-  if (v) await act(type, { name, reason: v.reason }, { after: refresh });
+/**
+ * Wen eine Aktion trifft: Name und ID. Derselbe Name kann unter mehreren IDs stehen (Welt neu
+ * hochgeladen) - mit der ID trifft es genau den Eintrag, auf den man geklickt hat.
+ */
+const who = (p) => ({ name: p.name, id: p.id });
+
+/** Die ID gilt nur, solange der Name im Feld nicht geaendert wurde. */
+const typed = (value, name, id) => (value === name && id ? { name: value, id } : { name: value });
+
+async function adminReason(type, p, title) {
+  const v = await dialog({ title: title + " · " + p.name, fields: [{ name: "reason", label: t("web.admin.reason"), maxlength: 120 }], ok: title, danger: type !== "admin.warn" });
+  if (v) await act(type, { ...who(p), reason: v.reason }, { after: refresh });
 }
 
-async function banDialog(name) {
+async function banDialog(name, id) {
   const v = await dialog({
     title: t("web.admin.ban"),
     fields: [
@@ -310,7 +319,7 @@ async function banDialog(name) {
     ok: t("web.admin.ban"),
     danger: true,
   });
-  if (v?.name?.trim()) await act("admin.ban", { name: v.name.trim(), minutes: Number(v.minutes), reason: v.reason }, { after: refresh });
+  if (v?.name?.trim()) await act("admin.ban", { ...typed(v.name.trim(), name, id), minutes: Number(v.minutes), reason: v.reason }, { after: refresh });
 }
 
 async function nameDialog(type, title) {
@@ -318,7 +327,7 @@ async function nameDialog(type, title) {
   if (v?.name?.trim()) await act(type, { name: v.name.trim() }, { after: refresh });
 }
 
-async function ltimeoutDialog(name = "") {
+async function ltimeoutDialog(name = "", id) {
   const v = await dialog({
     title: t("web.admin.ltimeout"),
     fields: [
@@ -328,7 +337,7 @@ async function ltimeoutDialog(name = "") {
     ok: t("web.admin.ltimeout"),
     danger: true,
   });
-  if (v?.name?.trim()) await act("admin.ltimeout", { name: v.name.trim(), hours: Math.max(1, Math.min(72, Math.floor(v.hours) || 4)) }, { after: refresh });
+  if (v?.name?.trim()) await act("admin.ltimeout", { ...typed(v.name.trim(), name, id), hours: Math.max(1, Math.min(72, Math.floor(v.hours) || 4)) }, { after: refresh });
 }
 
 async function broadcastDialog() {
