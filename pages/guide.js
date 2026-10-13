@@ -18,6 +18,7 @@ import { el, $, head, tabs, itemIcon } from "../ui.js";
 import { icon } from "../icons.js";
 import { go, subRoute, ITEM_IDS } from "../app.js";
 import { SERVER, RULES, ADDONS } from "../guide/texts.js";
+import { pct, oneIn, num } from "../guide/odds.js";
 
 let index;
 const data = new Map(); // slug -> Daten eines Addons
@@ -197,6 +198,7 @@ async function addonView(slug) {
   if (txt.start?.length) parts.push(el("section", "card", head(t("web.guide.howto"), "check"), el("ol", "steps", ...txt.start.map((x) => el("li", "", el("span", "", ...rich(x)))))));
   if (txt.features?.length) parts.push(el("section", "card" + (txt.start?.length ? "" : " wide"), head(t("web.guide.features"), "legacy"), el("dl", "features", ...txt.features.flatMap(([k, v]) => [el("dt", "", ...rich(k)), el("dd", "", ...rich(v))]))));
   if (txt.tips?.length) parts.push(el("section", "card wide", head(t("web.guide.tips"), "info"), el("ul", "tips", ...txt.tips.map((x) => el("li", "", el("span", "", ...rich(x)))))));
+  if (slug === "essentials") parts.push(...(await artifactsView()));
   if (!d) return parts;
 
   if (d.wiki?.length) parts.push(el("section", "card wide", head(t("web.guide.wiki"), "info"), el("div", "wiki", ...d.wiki.map((w) => el("details", "", el("summary", "", lang(w.t)), p(lang(w.d)))))));
@@ -207,6 +209,121 @@ async function addonView(slug) {
   if (d.items?.length) parts.push(gridCard(t("web.guide.items"), d.items));
   if (d.blocks?.length) parts.push(gridCard(t("web.guide.blocks"), d.blocks, true));
   return parts;
+}
+
+// ---------------------------------------------------------------- Artefakte (Essentials)
+/**
+ * Alle Artefakte mit Faehigkeit, Platz und Fundchance - aus guide/artifacts.json, das
+ * tools/web.mjs mit denselben Formeln rechnet, mit denen das Spiel wuerfelt.
+ */
+let arts;
+let lucky = false; // Schalter "mit Gluecksschal" - bleibt stehen, solange die Seite offen ist
+
+const chance = (x) => {
+  const n = oneIn(x);
+  return [el("b", "", pct(x, state.lang)), n ? el("small", "muted", " · " + t("web.guide.art.onein", num(n, state.lang))) : ""];
+};
+const srcRow = (label, x) => [el("dt", "", label), el("dd", "", ...chance(x))];
+const slotName = (s) => t(s === "carried" ? "web.guide.art.carried" : "artifacts.slot." + s);
+
+async function artifactsView() {
+  arts ??= await getJson("guide/artifacts.json").catch(() => undefined);
+  if (!arts) return [];
+  const r = arts.rules;
+  const P = (percent) => pct(percent / 100, state.lang);
+  const how = [
+    t("web.guide.art.how.slots"),
+    t("web.guide.art.how.own", P(r.common), P(r.uncommon), P(r.rare)),
+    t("web.guide.art.how.scatter", num(r.scatterShare, state.lang) + " %", P(r.scatterLegendary)),
+    t("web.guide.art.how.boss", P(r.bossLegendary), P(r.bossLegendary * (r.bossShare?.ravager ?? 0.5))),
+    t("web.guide.art.how.mimic", r.mimicEvery, P(r.mimicChance), r.mimicY[0], r.mimicY[1]),
+    t("web.guide.art.how.limits", r.legendaryLimit),
+    t("web.guide.art.how.luck"),
+    t("web.guide.art.how.enchant"),
+  ];
+
+  const search = el("input");
+  search.type = "search";
+  search.placeholder = t("web.guide.filter");
+  const option = (value, label) => Object.assign(el("option", "", label), { value });
+  const slotSel = el("select", "", option("", t("web.guide.art.slot.all")), ...arts.slots.map((s) => option(s, slotName(s))));
+  const raritySel = el("select", "", option("", t("web.guide.art.rarity.all")), ...arts.rarities.map((x) => option(x, t("artifacts.rarity." + x))));
+  const luck = el("input");
+  luck.type = "checkbox";
+  luck.checked = lucky;
+  const luckLabel = el("label", "check", luck, t("web.guide.art.luck"));
+  const info = el("p", "muted small");
+  const grid = el("div", "art-grid");
+  const mobBody = el("tbody");
+
+  const card = (a) => {
+    const rows = [
+      ...a.from.flatMap((s) => srcRow(lang(arts.mobs[s.mob]) + (s.boss ? " ★" : ""), lucky ? s.p2 : s.p)),
+      ...(a.any ? srcRow(t("web.guide.art.anymonster"), lucky ? a.any2 : a.any) : []),
+      // Mimics geben immer eins - der Schal aendert daran nichts
+      ...(a.mimic ? srcRow(t("web.guide.art.mimic"), a.mimic) : []),
+    ];
+    return el(
+      "article",
+      "art-card r-" + a.rarity,
+      el(
+        "div",
+        "art-head",
+        itemIcon(a.item, 36),
+        el(
+          "div",
+          "",
+          el("b", "", lang(a.n)),
+          state.lang === "de" && a.n.en && a.n.en !== a.n.de ? el("small", "muted sub", a.n.en) : "",
+          el("div", "tags", el("span", "tag rar r-" + a.rarity, t("artifacts.rarity." + a.rarity)), el("span", "tag", slotName(a.slot)))
+        )
+      ),
+      p(lang(a.d)),
+      a.origin ? el("p", "muted small", "⚑ " + lang(a.origin)) : "",
+      rows.length ? el("dl", "art-src", ...rows) : ""
+    );
+  };
+
+  const draw = () => {
+    lucky = luck.checked;
+    const q = search.value.trim().toLowerCase();
+    const shown = arts.list.filter(
+      (a) =>
+        (!slotSel.value || a.slot === slotSel.value) &&
+        (!raritySel.value || a.rarity === raritySel.value) &&
+        (!q || [a.n.de, a.n.en, a.d.de, a.d.en, ...a.from.map((s) => lang(arts.mobs[s.mob]))].join(" ").toLowerCase().includes(q))
+    );
+    info.textContent = t("web.guide.art.count", shown.length, arts.list.length);
+    grid.replaceChildren(...(shown.length ? shown.map(card) : [el("p", "empty", t("web.guide.art.none"))]));
+    // Nach Monster: dieselben Zahlen, andersherum gelesen
+    const byMob = new Map();
+    for (const a of arts.list) for (const s of a.from) byMob.set(s.mob, [...(byMob.get(s.mob) ?? []), [a, s]]);
+    mobBody.replaceChildren(
+      ...[...byMob].map(([mob, list]) =>
+        el(
+          "tr",
+          "",
+          el("td", "", el("b", "", lang(arts.mobs[mob])), r.bossShare?.[mob] ? el("small", "muted sub", t("web.guide.art.boss")) : ""),
+          el("td", "", el("div", "art-chips", ...list.map(([a, s]) => el("span", "art-chip r-" + a.rarity, itemIcon(a.item, 20), el("span", "", lang(a.n)), el("b", "", pct(lucky ? s.p2 : s.p, state.lang))))))
+        )
+      )
+    );
+  };
+  for (const c of [search, slotSel, raritySel]) c.addEventListener("input", draw);
+  luck.addEventListener("change", draw);
+  draw();
+
+  return [
+    el("section", "card wide", head(t("web.guide.art.how"), "info"), p(t("web.guide.art.lead", arts.list.length), "muted"), el("ul", "tips", ...how.map((x) => el("li", "", el("span", "", ...rich(x)))))),
+    el("section", "card wide", head(t("web.guide.art.title") + " (" + arts.list.length + ")", "gift"), el("div", "toolbar art-toolbar", search, slotSel, raritySel, luckLabel), info, grid),
+    el(
+      "section",
+      "card wide",
+      head(t("web.guide.art.bymob"), "players"),
+      p(t("web.guide.art.bymob.lead"), "muted small"),
+      el("div", "table-wrap", el("table", "data art-mobs", el("thead", "", el("tr", "", el("th", "", t("web.guide.col.name")), el("th", "", t("web.guide.art.title")))), mobBody))
+    ),
+  ];
 }
 
 const prettyGroup = (g) => String(g).replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
