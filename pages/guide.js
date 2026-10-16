@@ -17,7 +17,7 @@ import { state, t, getJson, itemName } from "../core.js";
 import { el, $, head, tabs, itemIcon } from "../ui.js";
 import { icon } from "../icons.js";
 import { go, subRoute, ITEM_IDS } from "../app.js";
-import { SERVER, RULES, ADDONS } from "../guide/texts.js";
+import { SERVER, RULES, ADDONS, LEGACY } from "../guide/texts.js";
 import { pct, oneIn, num } from "../guide/odds.js";
 
 let index;
@@ -198,7 +198,19 @@ async function addonView(slug) {
   if (txt.start?.length) parts.push(el("section", "card", head(t("web.guide.howto"), "check"), el("ol", "steps", ...txt.start.map((x) => el("li", "", el("span", "", ...rich(x)))))));
   if (txt.features?.length) parts.push(el("section", "card" + (txt.start?.length ? "" : " wide"), head(t("web.guide.features"), "legacy"), el("dl", "features", ...txt.features.flatMap(([k, v]) => [el("dt", "", ...rich(k)), el("dd", "", ...rich(v))]))));
   if (txt.tips?.length) parts.push(el("section", "card wide", head(t("web.guide.tips"), "info"), el("ul", "tips", ...txt.tips.map((x) => el("li", "", el("span", "", ...rich(x)))))));
-  if (slug === "essentials") parts.push(...(await artifactsView()));
+  if (slug === "essentials") {
+    const leg = await legacyView();
+    const art = await artifactsView();
+    // Die Seite ist lang - oben Spruenge zu den beiden grossen Teilen
+    const jump = (target, label) => {
+      const b = el("button", "chip on", label);
+      b.type = "button";
+      b.addEventListener("click", () => target?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      return b;
+    };
+    if (leg.length && art.length) parts.push(el("div", "filters wide jump", el("span", "muted small", t("web.guide.jump")), jump(leg[0], t("web.guide.leg.title")), jump(art[0], t("web.guide.art.title"))));
+    parts.push(...leg, ...art);
+  }
   if (!d) return parts;
 
   if (d.wiki?.length) parts.push(el("section", "card wide", head(t("web.guide.wiki"), "info"), el("div", "wiki", ...d.wiki.map((w) => el("details", "", el("summary", "", lang(w.t)), p(lang(w.d)))))));
@@ -209,6 +221,87 @@ async function addonView(slug) {
   if (d.items?.length) parts.push(gridCard(t("web.guide.items"), d.items));
   if (d.blocks?.length) parts.push(gridCard(t("web.guide.blocks"), d.blocks, true));
   return parts;
+}
+
+// ---------------------------------------------------------------- Das Vermaechtnis (Essentials)
+/**
+ * Rollen mit Faehigkeiten (Kosten, Abklingzeit), wie das Spiel laeuft und die globalen Aufgaben.
+ * Namen und Zahlen aus guide/legacy.json (tools/web.mjs liest sie aus dem Addon), die
+ * Erklaerungen aus guide/texts.js - {name} darin wird durch die Vorgabe der Weltregel ersetzt.
+ */
+let legacy;
+const SIDE = { town: ["good", "web.guide.leg.side.town"], traitor: ["bad", "web.guide.leg.side.traitor"], between: ["warn", "web.guide.leg.side.between"] };
+
+/** {name} durch die Zahl aus den Weltregeln ersetzen; Unbekanntes bleibt sichtbar stehen. */
+const fillRules = (text, rules) => String(text).replace(/\{(\w+)\}/g, (m, k) => (rules[k] === undefined ? m : typeof rules[k] === "number" ? num(rules[k], state.lang) : String(rules[k])));
+/** Abklingzeit lesbar: 30 s, 2 min, 1 h. */
+const dur = (s) => (!s ? "–" : s < 60 ? s + " s" : s % 3600 === 0 ? s / 3600 + " h" : Math.round(s / 60) + " min");
+
+async function legacyView() {
+  legacy ??= await getJson("guide/legacy.json").catch(() => undefined);
+  if (!legacy) return [];
+  const rules = legacy.rules;
+  const bullets = (list) => el("ul", "tips", ...list.map((x) => el("li", "", el("span", "", ...rich(fillRules(x, rules))))));
+
+  const ability = (a) =>
+    el(
+      "div",
+      "leg-ability",
+      el("div", "leg-ab-head", el("b", "", lang(a.n)), el("span", "tag" + (a.cost ? " warn" : ""), a.cost ? t("web.guide.leg.cost", num(a.cost, state.lang)) : t("web.guide.leg.free")), el("span", "tag", "⏱ " + dur(a.cooldown))),
+      el("p", "muted small", lang(a.d))
+    );
+  const role = (r) => {
+    const [cls, key] = SIDE[r.side] ?? SIDE.town;
+    return el(
+      "details",
+      "leg-role side-" + r.side,
+      el("summary", "", el("span", "", el("b", "", lang(r.n)), state.lang === "de" && r.n.en && r.n.en !== r.n.de ? el("small", "muted", " " + r.n.en) : ""), el("span", "tag " + cls, t(key))),
+      p(lang(r.d)),
+      LEGACY.roles[r.id]?.length ? bullets(LEGACY.roles[r.id]) : "",
+      r.abilities.length ? el("div", "leg-abilities", el("h4", "", t("web.guide.leg.abilities")), ...r.abilities.map(ability)) : el("p", "muted small", t("web.guide.leg.passive"))
+    );
+  };
+  const roles = legacy.roles.map(role);
+  const toggle = el("button", "btn ghost small", t("web.guide.leg.expand"));
+  toggle.type = "button";
+  toggle.addEventListener("click", () => {
+    const open = !roles.every((d) => d.open);
+    for (const d of roles) d.open = open;
+    toggle.textContent = t(open ? "web.guide.leg.collapse" : "web.guide.leg.expand");
+  });
+
+  const mechanics = LEGACY.mechanics.map((m) =>
+    el(
+      "details",
+      "",
+      el("summary", "", m.title),
+      bullets(m.items),
+      m.sabotages ? el("dl", "features", ...legacy.sabotages.flatMap((s) => [el("dt", "", lang(s.n)), el("dd", "", lang(s.d))])) : ""
+    )
+  );
+  const taskRows = legacy.tasks.map((x) =>
+    el(
+      "tr",
+      "",
+      el("td", "", t("web.guide.leg.chain", ["I", "II", "III"][x.chain - 1] ?? String(x.chain))),
+      el("td", "", el("b", "", lang(x.n)), x.d.de || x.d.en ? el("small", "muted sub", lang(x.d)) : ""),
+      el("td", "", num(x.target, state.lang)),
+      el("td", "", num(x.cp, state.lang))
+    )
+  );
+
+  return [
+    el("section", "card wide", head(t("web.guide.leg.title"), "legacy"), ...LEGACY.intro.map((x) => p(x)), el("p", "muted small", t("web.guide.leg.defaults"))),
+    el("section", "card wide", head(t("web.guide.leg.roles", legacy.roles.length), "players", toggle), p(t("web.guide.leg.roles.lead"), "muted small"), el("div", "leg-roles", ...roles)),
+    el("section", "card wide", head(t("web.guide.leg.how"), "info"), el("div", "wiki", ...mechanics)),
+    el(
+      "section",
+      "card wide",
+      head(t("web.guide.leg.tasks", legacy.tasks.length), "check"),
+      p(t("web.guide.leg.tasks.lead", num(rules.openSlots, state.lang)), "muted small"),
+      el("div", "table-wrap", el("table", "data", el("thead", "", el("tr", "", ...["chain", "task", "goal", "cp"].map((k) => el("th", "", t("web.guide.leg.col." + k))))), el("tbody", "", ...taskRows)))
+    ),
+  ];
 }
 
 // ---------------------------------------------------------------- Artefakte (Essentials)

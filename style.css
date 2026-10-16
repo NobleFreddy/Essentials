@@ -2382,3 +2382,69 @@ dl.art-src dd {
 .art-toolbar .check {
   flex: 1 1 100%;
 }
+
+/* ---------------------------------------------------------------- Vermaechtnis im Server-Guide */
+.jump {
+  align-items: center;
+}
+.leg-roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
+  gap: 0.6rem;
+  align-items: start;
+  margin-top: 0.5rem;
+}
+.leg-role {
+  --sc: var(--accent);
+  min-width: 0;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--sc);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+.leg-role.side-traitor {
+  --sc: var(--danger);
+}
+.leg-role.side-between {
+  --sc: var(--gold);
+}
+.leg-role > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.leg-role[open] > summary {
+  margin-bottom: 0.35rem;
+}
+.leg-role > p {
+  margin: 0.35rem 0;
+}
+.leg-role ul.tips {
+  margin: 0.35rem 0;
+}
+.leg-abilities h4 {
+  margin: 0.7rem 0 0.2rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.leg-ability {
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--line);
+}
+.leg-ab-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.leg-ab-head b {
+  margin-right: auto;
+}
+.leg-ability p {
+  margin: 0.2rem 0 0;
+}

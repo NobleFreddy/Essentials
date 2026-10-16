@@ -385,3 +385,118 @@ export const ADDONS = {
     tips: ["Illager-Lager und -Festungen sind bewohnt – vorbereitet hingehen.", "Bauwerke sind gemeinsame Orte (Regel 4): plündern ja, abreißen nein."],
   },
 };
+
+/**
+ * Das Vermaechtnis: was jede Rolle ausmacht und wie das Spiel laeuft. Namen, Kurztexte, Kosten
+ * und Abklingzeiten der Faehigkeiten kommen aus guide/legacy.json (tools/web.mjs, aus dem Addon);
+ * {name} steht fuer eine Zahl aus den Weltregeln (Vorgabe) und wird auf der Seite eingesetzt.
+ */
+export const LEGACY = {
+  intro: [
+    "Ein Gemeinschaftsprojekt über Wochen: Die Gruppe arbeitet in **Zyklen** an globalen Aufgaben, jeder bekommt heimlich eine **Rolle** – und einer von euch ist der **Verräter**.",
+    "Deine Rolle siehst du im Menü unter *Das Vermächtnis → Meine Rolle*, mit Sicherheitsfrage, falls dir jemand über die Schulter schaut. Fähigkeiten kosten **Contribution Points (CP)**, die du mit Beiträgen zu den Aufgaben und mit Spielzeit verdienst.",
+  ],
+  roles: {
+    traitor: [
+      "Muss sich ein **Ziel** festlegen. Nur dieses Ziel scheidet durch seine Hand endgültig aus – jeder andere Tod durch ihn ist eine gewöhnliche Auszeit. Wechseln geht jederzeit, aber der Bodyguard erfährt jedes neue Ziel.",
+      "Bestimmt gleich nach der Enthüllung seinen **Nachfolger** – einmal, nicht änderbar. Der weiß von nichts und wacht erst im nächsten Zyklus als Verräter auf.",
+      "**Bestechung:** bietet {bribeDiamonds} Diamanten, die er nicht besitzen muss. Wer annimmt, kann nicht mehr gegen ihn stimmen. Nimmt der Bürgermeister an, übersteht der Verräter die nächste Abstimmung gegen ihn.",
+      "**Phantomwandeln:** unsichtbar und unter fremdem Namen. Stirbt in dieser Zeit jemand durch ihn, steht im Totenbuch der falsche Name.",
+      "**Sabotage:** Stromausfall, Störung im System oder Dunkle Nacht – siehe *So läuft es*.",
+      "Fällt er, endet der Zyklus sofort: *Das Vermächtnis erstrahlt*, und die Schwarze Nacht beginnt.",
+    ],
+    mayor: ["Seine Stimme zählt **doppelt**.", "Lässt er sich bestechen, bekommt der Verräter eine **Wahl-Immunität** – die nächste Abstimmung gegen ihn verläuft im Sande."],
+    treasurer: ["Findet heraus, wer eine Bestechung des Verräters angenommen hat – und damit, wer gegen ihn nicht stimmen kann."],
+    fool: ["Will selbst **herausgewählt** werden. Gelingt es, scheidet er **nicht** aus, sondern bekommt einmal je Zyklus **{foolDiamonds} Diamanten**."],
+    seer: ["Erkennt die Rolle eines Spielers. Aber Vorsicht: Der Doppelagent kann sich tarnen, und mit seiner *Rückendeckung* zeigt die nächste Prüfung am Verräter „Bürger“."],
+    hacker: ["Beendet jede laufende Sabotage sofort – auch die Störung im System, die alle anderen Fähigkeiten sperrt. Seine eigene sperrt sie nicht."],
+    recorder: ["Weiß, wer gerade online ist und seit wann, wer wann zuletzt da war und wie lange – gut, um Alibis zu prüfen."],
+    detective: ["Liest im **Totenbuch** die letzten zehn Tode mit Zeitpunkt und Täter. Steht dort ein Name, kann es trotzdem der falsche sein – im Phantomwandeln trägt der Verräter einen fremden."],
+    victim: ["Keine Fähigkeit. Wird das Opfer vom Verräter **endgültig** eliminiert, wird der Verräter **öffentlich enthüllt**."],
+    guardian_angel: [
+      "Fällt er als erklärtes Ziel durch den Verräter, bleibt er **{angelMinutes} Minuten als Zuschauer** und wählt **zwei Spieler**, die er schützt. Danach scheidet er aus.",
+      "Der Schutz wirkt einmal: Wird ein Schützling als erklärtes Ziel vom Verräter getötet, überlebt er – auch wenn der Engel längst fort ist.",
+    ],
+    bodyguard: [
+      "Bekommt eine Meldung, sobald der Verräter ein **Ziel** festlegt oder wechselt – auch offline, beim nächsten Betreten.",
+      "*Beobachten* meldet, wenn sein Schützling vom Verräter getroffen wird, und nennt, wen der Verräter gerade im Visier hat.",
+    ],
+    sheriff: [
+      "Klagt einen Spieler an und hat dann **{sheriffMinutes} Minuten**, ihn **selbst zu töten**.",
+      "Ist es der Verräter, scheidet der endgültig aus – keine Immunität hilft. Ist er es nicht, bekommt der Getötete seine gewöhnliche Auszeit, der Sheriff aber die **dreifache**.",
+    ],
+    double_agent: [
+      "Beginnt jeden Zyklus **unentschieden** und bekommt Aufträge von beiden Seiten – zur halben Belohnung.",
+      "Wählt dann eine Seite: die Stadt – oder er bietet dem Verräter seine Dienste an. Nimmt der an, erfährt der Agent seinen Namen und kann nicht mehr gegen ihn stimmen. Einmal je Zyklus darf er zur Stadt überlaufen; dann erfährt der Verräter **seinen** Namen.",
+      "Schreibt dem Verräter anonym, bestimmt, welche Rolle der Seher bei ihm sieht, und kann die Maske des Verräters im Phantomwandeln durchschauen.",
+      "Erfüllte Aufträge bringen CP (Grundwert {missionReward}), dazu **{loyaltyCp} CP** für jeden Spieltag, den der Verräter mit ihm als Agent übersteht.",
+    ],
+    citizen: ["Keine Sonderfähigkeit – aber jede Stimme und jeder Beitrag zählt. Bürger wird, wer übrig bleibt, wenn alle Sonderrollen vergeben sind."],
+  },
+  mechanics: [
+    {
+      title: "Ein Zyklus",
+      items: [
+        "Zu Beginn werden die Rollen geheim verteilt: **ein Verräter**, die Sonderrollen, die der Operator in den Topf gelegt hat, und der Rest wird **Bürger**. Wer später dazukommt, bekommt eine freie Rolle – nie den Verräter.",
+        "Die Gruppe arbeitet an den **globalen Aufgaben**, stimmt ab und sucht den Verräter. Der arbeitet dagegen – mit Sabotagen, Bestechung und seinem Ziel.",
+        "Der Zyklus endet, wenn der Verräter fällt. Dann kommt die **Schwarze Nacht** und danach der nächste Zyklus mit neuen Rollen.",
+      ],
+    },
+    {
+      title: "Contribution Points (CP)",
+      items: [
+        "Jeder Beitrag zu einer Aufgabe bringt **sofort anteilig** Punkte: Wer ein Viertel beiträgt, bekommt ein Viertel ihrer CP – auch wenn die Aufgabe nie fertig wird.",
+        "Dazu **{passiveCp} CP je Minute** im Spiel, höchstens **{passiveCap} am Tag**. Wer fünf Minuten lang weder geht noch sich umsieht, bekommt dafür nichts.",
+        "Fähigkeiten kosten CP und haben eine Abklingzeit. Was eine Fähigkeit herausfindet, erfährt nur, wer sie benutzt – im Chat landet nichts davon.",
+      ],
+    },
+    {
+      title: "Abstimmungen",
+      items: [
+        "Eine **normale Abstimmung** eröffnet der Operator, eine **Notfall-Abstimmung** jeder Spieler – davon gibt es **{emergencyTotal} je Zyklus**, und jeder darf höchstens eine auslösen. Eine Abstimmung dauert **{voteMinutes} Minuten**.",
+        "Der Zwischenstand bleibt verborgen. Umentscheiden geht, solange die Zeit läuft; *Überspringen* ist eine Stimme für niemanden.",
+        "Bei **Gleichstand** – oder wenn *Überspringen* vorne liegt – scheidet niemand aus. Sonst scheidet der Gewählte aus. Ausnahme: der Narr.",
+        "Gewählt werden kann auch, wer gerade eine Auszeit hat – aus der Auszeit heraus abstimmen kann man aber nicht.",
+      ],
+    },
+    {
+      title: "Combat-Log, Tod und Auszeit",
+      items: [
+        "Jeder gefährliche Treffer startet den **Combat-Log** ({combatSeconds} Sekunden, jeder weitere Treffer setzt ihn zurück). **Rot** heißt: ein Spieler hat zugeschlagen – daran hängen die Folgen. **Orange**: nur Monster oder TNT.",
+        "Gewöhnliche Tode (Monster, Sturz, Lava): die ersten {strikesFree} an einem Tag sind folgenlos, erst der **{deathStrikes}.** kostet **{timeoutHours} Stunden** Auszeit.",
+        "Tod im **roten** Combat-Log: **{playerTimeoutHours} Stunden** Auszeit – auch wenn am Ende ein Monster den letzten Schlag setzt.",
+        "Tod als **erklärtes Ziel** des Verräters: **ausgeschieden**.",
+        "Auszeit heißt: Du kommst so lange nicht auf den Server. Ausloggen hilft nicht – der Combat-Log läuft weiter, während du weg bist.",
+      ],
+    },
+    {
+      title: "Ausgeschieden",
+      items: [
+        "Wer herausgewählt, vom Verräter als erklärtes Ziel getötet oder vom Sheriff erwischt wird, ist **{outHours} Stunden** gesperrt.",
+        "Danach kommt er wieder auf den Server, hat aber mit dem Vermächtnis nichts mehr zu tun – keine Rolle, keine Aufgaben, keine Abstimmungen – **für das ganze Spiel**. Nur der Operator kann ihn zurückholen.",
+      ],
+    },
+    {
+      title: "Sabotagen",
+      items: [
+        "Es läuft immer nur eine. Der **Hacker** beendet sie, der Operator auch.",
+        "Stromausfall und Störung dauern **{sabotageMinutes} Minuten**, die Dunkle Nacht **{darkNightMinutes} Minuten**. Die Dunkle Nacht kommt auch von selbst – mit {darkNightChance} % je Spieltag.",
+        "Schlafen beendet die Dunkle Nacht nicht: Die Uhr wird auf Nacht festgehalten.",
+      ],
+      sabotages: true,
+    },
+    {
+      title: "Zyklusende und die Schwarze Nacht",
+      items: [
+        "Fällt der Verräter, **erstrahlt das Vermächtnis**. Der letzte Spieler, der dann noch steht, wird **Wächter des Vermächtnisses** – und direkt danach beginnt die Schwarze Nacht.",
+        "**{blackNightMinutes} Minuten**, die niemand überleben soll: Die Uhr steht auf Nacht, um jeden Spieler tauchen ständig neue, starke Monster auf, und alle sind geschwächt. Schlafen hilft nicht.",
+        "Am Ende stirbt, wer noch steht. Wer in ihr stirbt, ist **{cycleBanHours} Stunden** draußen – wer offline war, bekommt nichts.",
+        "Danach beginnt der nächste Zyklus mit neuen Rollen, und der Nachfolger des alten Verräters wacht als neuer Verräter auf.",
+      ],
+    },
+    {
+      title: "Nether und End",
+      items: ["Beide sind zu Beginn verschlossen und öffnen sich nach der **gemeinsamen Spielzeit** aller Spieler: der Nether nach **{netherHours} Stunden**, das End nach **{endHours}**. Wie lange es noch dauert, steht im Menü des Vermächtnisses."],
+    },
+  ],
+};
