@@ -27,6 +27,7 @@ export function legacySummary(L) {
   const tags = el("div", "tags", L.phase === "storm" ? el("span", "tag bad", t("web.legacy.phase.storm", L.stormLeft)) : el("span", "tag good", t("web.legacy.phase.running")));
   if (L.vote?.open) tags.append(el("span", "tag warn", t(L.vote.kind === "emergency" ? "web.legacy.vote.emergency" : "web.legacy.vote", until(L.vote.endsAt))));
   else if (L.nextVote?.at > Date.now()) tags.append(el("span", "tag", "⌚ " + t("web.legacy.nextvote", dateTime(L.nextVote.at))));
+  if (L.revealed?.name) tags.append(el("span", "tag bad", "⚠ " + t("web.legacy.revealed", plain(L.revealed.name))));
   return [
     el("div", "big", t("web.legacy.cycle", L.cycle, L.day)),
     tags,
@@ -169,6 +170,8 @@ function myLegacy(m) {
     el("div", "row", el("span", "", t("web.legacy.status")), el("span", m.status === "alive" ? "tag good" : "tag bad", t("legacy.status." + m.status) + (m.banMinutes > 0 ? " · " + ago(m.banMinutes * 60000) : ""))),
     el("div", "row", el("span", "", t("web.legacy.strikes")), el("span", "muted", m.strikes + "/3"))
   );
+  // Nur der Verraeter sieht das - und nur, wenn es knapp wird
+  if (m.revealIn) box.append(el("p", "callout bad", t("web.legacy.revealwarn", m.revealIn)));
   if (m.vote?.open) {
     box.append(el("h3", "", t(m.vote.kind === "emergency" ? "web.legacy.vote.emergency" : "web.legacy.vote", until(m.vote.endsAt))));
     if (!m.canVote) box.append(empty("web.legacy.novote"));

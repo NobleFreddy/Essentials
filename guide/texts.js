@@ -404,6 +404,7 @@ export const LEGACY = {
       "**Phantomwandeln:** unsichtbar und unter fremdem Namen. Stirbt in dieser Zeit jemand durch ihn, steht im Totenbuch der falsche Name.",
       "**Sabotage:** Stromausfall, Störung im System oder Dunkle Nacht – siehe *So läuft es*.",
       "Fällt er, endet der Zyklus sofort: *Das Vermächtnis erstrahlt*, und die Schwarze Nacht beginnt.",
+      "**Abtauchen gilt nicht:** Ist er **{revealDays} Tage** am Stück nicht im Spiel, erfahren alle, wer er ist – er spielt dann offen weiter. Einen Tag vorher bekommt er eine private Warnung; Zeit, in der der Server aus war oder er gesperrt war, zählt nicht.",
     ],
     mayor: ["Seine Stimme zählt **doppelt**.", "Lässt er sich bestechen, bekommt der Verräter eine **Wahl-Immunität** – die nächste Abstimmung gegen ihn verläuft im Sande."],
     treasurer: ["Findet heraus, wer eine Bestechung des Verräters angenommen hat – und damit, wer gegen ihn nicht stimmen kann."],
