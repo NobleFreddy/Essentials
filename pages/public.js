@@ -3,7 +3,7 @@
  * Wer angemeldet ist, bekommt dort zusaetzlich seine Knoepfe (annehmen, abstimmen ...).
  */
 import { state, t, has, loggedIn, itemName } from "../core.js";
-import { el, $, meter, ago, until, empty, itemList, button, act, dialog, confirmDialog, toast, head, avatar, itemIcon } from "../ui.js";
+import { el, $, meter, ago, until, dateTime, empty, itemList, button, act, dialog, confirmDialog, toast, head, avatar, itemIcon } from "../ui.js";
 import { icon } from "../icons.js";
 import { pixelText } from "../pixel.js";
 import { flatten, colorize, plain, fill } from "../rawtext.js";
@@ -26,6 +26,7 @@ export function legacySummary(L) {
   if (!L.running && L.phase !== "storm") return [empty("web.legacy.idle"), L.cycle ? el("p", "muted", t("web.legacy.cycle", L.cycle, L.day)) : ""];
   const tags = el("div", "tags", L.phase === "storm" ? el("span", "tag bad", t("web.legacy.phase.storm", L.stormLeft)) : el("span", "tag good", t("web.legacy.phase.running")));
   if (L.vote?.open) tags.append(el("span", "tag warn", t(L.vote.kind === "emergency" ? "web.legacy.vote.emergency" : "web.legacy.vote", until(L.vote.endsAt))));
+  else if (L.nextVote?.at > Date.now()) tags.append(el("span", "tag", "⌚ " + t("web.legacy.nextvote", dateTime(L.nextVote.at))));
   return [
     el("div", "big", t("web.legacy.cycle", L.cycle, L.day)),
     tags,

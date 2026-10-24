@@ -454,6 +454,7 @@ export const LEGACY = {
       title: "Abstimmungen",
       items: [
         "Eine **normale Abstimmung** eröffnet der Operator, eine **Notfall-Abstimmung** jeder Spieler – davon gibt es **{emergencyTotal} je Zyklus**, und jeder darf höchstens eine auslösen. Eine Abstimmung dauert **{voteMinutes} Minuten**.",
+        "Der Operator kann die nächste Abstimmung **planen**, auch regelmäßig. Den Termin siehst du im Menü des Vermächtnisses und auf der Webseite; eine Stunde und zehn Minuten vorher erinnert der Chat, und zum Termin geht sie von selbst auf.",
         "Der Zwischenstand bleibt verborgen. Umentscheiden geht, solange die Zeit läuft; *Überspringen* ist eine Stimme für niemanden.",
         "Bei **Gleichstand** – oder wenn *Überspringen* vorne liegt – scheidet niemand aus. Sonst scheidet der Gewählte aus. Ausnahme: der Narr.",
         "Gewählt werden kann auch, wer gerade eine Auszeit hat – aus der Auszeit heraus abstimmen kann man aber nicht.",
@@ -480,7 +481,7 @@ export const LEGACY = {
       title: "Sabotagen",
       items: [
         "Es läuft immer nur eine. Der **Hacker** beendet sie, der Operator auch.",
-        "Stromausfall und Störung dauern **{sabotageMinutes} Minuten**, die Dunkle Nacht **{darkNightMinutes} Minuten**. Die Dunkle Nacht kommt auch von selbst – mit {darkNightChance} % je Spieltag.",
+        "Stromausfall und Störung dauern **{sabotageMinutes} Minuten**, die Dunkle Nacht **{darkNightMinutes} Minuten**. Die Dunkle Nacht kommt auch von selbst – alle {darkNightMinDays} bis {darkNightMaxDays} Tage, zu einem zufälligen Zeitpunkt, sobald jemand im Spiel ist.",
         "Schlafen beendet die Dunkle Nacht nicht: Die Uhr wird auf Nacht festgehalten.",
       ],
       sabotages: true,

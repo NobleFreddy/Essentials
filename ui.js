@@ -2,7 +2,7 @@
  * Bausteine der Webseite: Elemente, Balken, Items, Hinweise (Toasts) und Dialoge.
  * Alles als DOM gebaut, nie als HTML-Text - was vom Server kommt, bleibt Text.
  */
-import { t, itemName, command, reasonText, getJson } from "./core.js";
+import { t, itemName, command, reasonText, getJson, state } from "./core.js";
 import { icon } from "./icons.js";
 
 export function el(tag, cls, ...kids) {
@@ -36,6 +36,15 @@ export function ago(ms) {
 export function until(ts) {
   const ms = ts - Date.now();
   return ms > 0 ? ago(ms) : "–";
+}
+
+/** "Sa., 25.10., 20:00" - in der Sprache der Seite und der Zeitzone dessen, der sie ansieht. */
+export function dateTime(ts) {
+  try {
+    return new Date(ts).toLocaleString(state.lang === "de" ? "de-DE" : "en-GB", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return new Date(ts).toISOString().slice(0, 16).replace("T", " ");
+  }
 }
 
 export const empty = (key) => el("p", "empty", t(key));

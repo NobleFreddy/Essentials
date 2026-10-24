@@ -3,7 +3,7 @@
  * Karte), Web-Zugaenge und das Protokoll. Jede Aktion prueft das Addon noch einmal.
  */
 import { state, t, resetWebsite, reasonText } from "../core.js";
-import { el, $, ago, empty, button, act, dialog, confirmDialog, tabs, head, avatar, toast } from "../ui.js";
+import { el, $, ago, dateTime, empty, button, act, dialog, confirmDialog, tabs, head, avatar, toast } from "../ui.js";
 import { plain, fill } from "../rawtext.js";
 import { refresh, go, clearMapView } from "../app.js";
 import { playerNames } from "./public.js";
@@ -149,7 +149,19 @@ function worldTab(a) {
       )
     ),
     card(t("web.gates"), "map", gates),
-    card(t("web.admin.legacy"), "legacy", el("div", "actions wrap", button(t("web.admin.ltimeout"), () => ltimeoutDialog(""), "ghost"), button(t("web.admin.lpardon"), () => nameDialog("admin.lpardon", t("web.admin.lpardon")), "ghost"))),
+    card(
+      t("web.admin.legacy"),
+      "legacy",
+      votePlanLine(),
+      el(
+        "div",
+        "actions wrap",
+        button(t("web.admin.vote.plan"), () => votePlanDialog(), "ghost"),
+        nextVote() ? button(t("web.admin.vote.unplan"), () => act("admin.vote.unplan", {}, { after: refresh }), "ghost") : "",
+        button(t("web.admin.ltimeout"), () => ltimeoutDialog(""), "ghost"),
+        button(t("web.admin.lpardon"), () => nameDialog("admin.lpardon", t("web.admin.lpardon")), "ghost")
+      )
+    ),
   ];
 }
 
@@ -325,6 +337,48 @@ async function banDialog(name, id) {
 async function nameDialog(type, title) {
   const v = await dialog({ title, fields: [{ name: "name", label: t("web.player"), list: knownNames() }], ok: title });
   if (v?.name?.trim()) await act(type, { name: v.name.trim() }, { after: refresh });
+}
+
+// ---------------------------------------------------------------- Geplante Abstimmung
+/** Wiederholung wie im Spiel (VOTE_REPEATS in legacy/core/schedule.js): 0 = einmalig, in Tagen. */
+const REPEATS = [0, 1, 2, 3, 4, 5, 6, 7, 14];
+const repeatLabel = (n) => (!n ? t("web.admin.vote.once") : n === 1 ? t("web.admin.vote.daily") : n % 7 === 0 ? t("web.admin.vote.weeks", n / 7) : t("web.admin.vote.days", n));
+const nextVote = () => {
+  const p = state.snap?.data?.legacy?.nextVote;
+  return p?.at > Date.now() ? p : null;
+};
+
+function votePlanLine() {
+  const p = nextVote();
+  return el("p", "muted small", p ? "⌚ " + t("web.admin.vote.planned", dateTime(p.at), repeatLabel(p.every)) : t("web.admin.vote.none"));
+}
+
+/** Zwei Ziffern - fuer das Feld "Datum und Uhrzeit", das Ortszeit ohne Zone erwartet. */
+const two = (n) => String(n).padStart(2, "0");
+const localInput = (ms) => {
+  const d = new Date(ms);
+  return d.getFullYear() + "-" + two(d.getMonth() + 1) + "-" + two(d.getDate()) + "T" + two(d.getHours()) + ":" + two(d.getMinutes());
+};
+
+async function votePlanDialog() {
+  const p = nextVote();
+  // Vorschlag: der bestehende Termin, sonst morgen 20 Uhr
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(20, 0, 0, 0);
+  const v = await dialog({
+    title: t("web.admin.vote.plan"),
+    text: t("web.admin.vote.plan.text"),
+    fields: [
+      { name: "at", label: t("web.admin.vote.when"), type: "datetime-local", value: localInput(p?.at ?? tomorrow.getTime()) },
+      { name: "every", label: t("web.admin.vote.repeat"), type: "select", options: REPEATS.map((n) => [String(n), repeatLabel(n)]), value: String(p?.every ?? 0) },
+    ],
+    ok: t("web.admin.vote.save"),
+  });
+  if (!v?.at) return;
+  const at = new Date(v.at).getTime();
+  if (!(at > Date.now())) return toast(t("web.admin.vote.past"), "bad");
+  await act("admin.vote.plan", { at, every: Number(v.every) || 0 }, { okText: t("web.admin.vote.planned", dateTime(at), repeatLabel(Number(v.every) || 0)), after: refresh });
 }
 
 async function ltimeoutDialog(name = "", id) {
