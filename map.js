@@ -6,7 +6,7 @@
  * Savanne gelblich, im Sumpf truebe, im warmen Ozean tuerkis. Dazu Relief wie bei einer
  * Lampe im Nordwesten, und Wasser wird mit der Tiefe dunkler.
  */
-import { decodeTile, fallbackColor } from "./shared/mapscan.js";
+import { tileBytes, columnAt, fallbackColor, BYTES_PER_COLUMN } from "./shared/mapscan.js";
 import { TINTED, BASE, biomeTint } from "./shared/tints.js";
 
 // ---------------------------------------------------------------- Texturen
@@ -20,6 +20,17 @@ export const TEXTURE_SCALE = 6;
 const TEXTURE_CACHE = 320;
 /** So viele werden je Bild neu gezeichnet - der Rest folgt im naechsten, die Karte ruckelt nicht. */
 const TEXTURE_PER_FRAME = 24;
+/**
+ * Gezeichnet wird in Regionen: eine Leinwand fuer REGION x REGION Stuecke, ein Pixel je Block.
+ * Frueher hatte jedes Stueck seine eigene - bei zwanzigtausend Stuecken zehntausende
+ * Leinwaende, und das Zeichnen wurde zaeh.
+ */
+export const REGION = 8;
+/**
+ * So viele Stuecke werden je Bild schattiert. Eine grosse Karte entsteht so ueber ein paar
+ * Bilder hinweg, statt die Seite beim Laden fuer Sekunden (auf dem Handy: Minuten) einzufrieren.
+ */
+const SHADE_PER_FRAME = 600;
 /** Mittleres Grau der Biom-Texturen: so hell wie in der Farbansicht (siehe gen-map-colors.mjs). */
 export const GREY = 150;
 let atlas;
@@ -108,7 +119,7 @@ export const SCOPE_ICON = { me: "◆", clan: "⚑", all: "★", death: "✝", ho
 
 export function createMap(canvas, { onHover, onClick } = {}) {
   const ctx = canvas.getContext("2d");
-  const dims = new Map(); // dim -> Map("cx,cz" -> tile)
+  const dims = new Map(); // dim -> { tiles: Map("cx,cz" -> tile), regions: Map("rx,rz" -> region) }
   let dim = "minecraft:overworld";
   const view = { x: 0, z: 0, scale: 3 };
   let players = [];
@@ -119,52 +130,114 @@ export function createMap(canvas, { onHover, onClick } = {}) {
   const fitted = new Set();
 
   const key = (cx, cz) => cx + "," + cz;
-  const tilesOf = (d = dim) => {
-    if (!dims.has(d)) dims.set(d, new Map());
+  const layerOf = (d = dim) => {
+    if (!dims.has(d)) dims.set(d, { tiles: new Map(), regions: new Map() });
     return dims.get(d);
   };
+  const tilesOf = (d = dim) => layerOf(d).tiles;
 
-  function shadeTile(d, cx, cz) {
-    const tiles = tilesOf(d);
-    const t = tiles.get(key(cx, cz));
+  /** Die Region eines Stuecks - eine Leinwand fuer REGION x REGION Stuecke, ein Pixel je Block. */
+  function regionOf(layer, cx, cz) {
+    const rx = Math.floor(cx / REGION);
+    const rz = Math.floor(cz / REGION);
+    const k = key(rx, rz);
+    let r = layer.regions.get(k);
+    if (!r) {
+      const c = document.createElement("canvas");
+      c.width = REGION * 16;
+      c.height = REGION * 16;
+      r = { rx, rz, canvas: c, ctx: c.getContext("2d"), pending: new Set() };
+      layer.regions.set(k, r);
+    }
+    return r;
+  }
+
+  /** Neu zu schattieren - das geschieht erst, wenn die Region zu sehen ist (draw). */
+  function queue(layer, t) {
     if (!t) return;
-    const north = tiles.get(key(cx, cz - 1));
-    const west = tiles.get(key(cx - 1, cz));
+    t.shade = undefined;
+    texCache.delete(t);
+    regionOf(layer, t.cx, t.cz).pending.add(t);
+  }
+
+  /** Farbe von Block und Biom - einmal berechnet, dann aus dem Speicher. */
+  const colorCache = new Map();
+  function colorOf(id, biome) {
+    const k = id + "|" + biome;
+    let rgb = colorCache.get(k);
+    if (!rgb) {
+      rgb = columnRgb({ id, biome });
+      colorCache.set(k, rgb);
+    }
+    return rgb;
+  }
+  const colorAt = (t, i) => colorOf(t.p?.[t.bytes[i * BYTES_PER_COLUMN]] ?? "air", t.b?.[t.bytes[i * BYTES_PER_COLUMN + 4]] ?? "");
+
+  /**
+   * Ein Stueck in seine Region malen. Laeuft fuer zehntausende Stuecke - deshalb direkt auf den
+   * Bytes, ohne Objekte je Saeule. Hoehen bleiben roh (y + 64, nie negativ): fuer das Relief
+   * zaehlen nur die Unterschiede, -1 heisst "kein Nachbar".
+   */
+  function shadeTile(layer, t) {
+    const north = layer.tiles.get(key(t.cx, t.cz - 1));
+    const west = layer.tiles.get(key(t.cx - 1, t.cz));
+    const B = BYTES_PER_COLUMN;
+    const bytes = t.bytes;
     const img = new ImageData(16, 16);
-    // Je Block: Helligkeit (Relief) und ob die Nachbarn im Norden / Westen hoeher liegen -
-    // die Texturen bekommen dort eine Schattenkante
-    t.shade = new Float32Array(256);
+    const out = img.data;
+    const local = new Map(); // (Block, Biom) dieses Stuecks -> Farbe
+    // Je Block: Helligkeit (Relief, in Hundertsteln) und ob die Nachbarn im Norden / Westen
+    // hoeher liegen - die Texturen bekommen dort eine Schattenkante
+    t.shade = new Uint8Array(256);
     t.edge = new Uint8Array(256);
-    t.tex = undefined;
     for (let z = 0; z < 16; z++) {
       for (let x = 0; x < 16; x++) {
-        const col = t.cols[z * 16 + x];
-        const n = z > 0 ? t.cols[(z - 1) * 16 + x] : north?.cols[15 * 16 + x];
-        const w = x > 0 ? t.cols[z * 16 + x - 1] : west?.cols[z * 16 + 15];
-        let f = 1;
-        if (col.depth > 0) {
-          // Wasser: je tiefer, desto dunkler; ganz flach scheint der Grund durch
-          f = 1.08 - Math.min(0.5, col.depth * 0.04);
-        } else {
-          const delta = (n ? col.y - n.y : 0) + (w ? col.y - w.y : 0);
-          f = 1 + Math.max(-0.32, Math.min(0.22, delta * 0.07));
-          t.edge[z * 16 + x] = (n && n.y > col.y && !n.depth ? 1 : 0) | (w && w.y > col.y && !w.depth ? 2 : 0);
+        const i = z * 16 + x;
+        const o = i * B;
+        const y = bytes[o + 1] + bytes[o + 2] * 256;
+        const depth = bytes[o + 3];
+        let n = -1;
+        let nDepth = 0;
+        const nb = z > 0 ? bytes : north?.bytes;
+        if (nb) {
+          const q = z > 0 ? o - 16 * B : (240 + x) * B;
+          n = nb[q + 1] + nb[q + 2] * 256;
+          nDepth = nb[q + 3];
         }
-        t.shade[z * 16 + x] = f;
-        const [r, g, b] = columnRgb(col);
-        const i = (z * 16 + x) * 4;
-        img.data[i] = Math.min(255, r * f);
-        img.data[i + 1] = Math.min(255, g * f);
-        img.data[i + 2] = Math.min(255, b * f);
-        img.data[i + 3] = col.id === "air" ? 0 : 255;
+        let w = -1;
+        let wDepth = 0;
+        const wb = x > 0 ? bytes : west?.bytes;
+        if (wb) {
+          const q = x > 0 ? o - B : (z * 16 + 15) * B;
+          w = wb[q + 1] + wb[q + 2] * 256;
+          wDepth = wb[q + 3];
+        }
+        let f = 1;
+        if (depth > 0) {
+          // Wasser: je tiefer, desto dunkler; ganz flach scheint der Grund durch
+          f = 1.08 - Math.min(0.5, depth * 0.04);
+        } else {
+          const delta = (n >= 0 ? y - n : 0) + (w >= 0 ? y - w : 0);
+          f = 1 + Math.max(-0.32, Math.min(0.22, delta * 0.07));
+          t.edge[i] = (n > y && !nDepth ? 1 : 0) | (w > y && !wDepth ? 2 : 0);
+        }
+        t.shade[i] = Math.round(f * 100);
+        const ck = (bytes[o] << 8) | bytes[o + 4];
+        let rgb = local.get(ck);
+        if (!rgb) {
+          rgb = colorAt(t, i);
+          local.set(ck, rgb);
+        }
+        const p = i * 4;
+        out[p] = Math.min(255, rgb[0] * f);
+        out[p + 1] = Math.min(255, rgb[1] * f);
+        out[p + 2] = Math.min(255, rgb[2] * f);
+        out[p + 3] = (t.p?.[bytes[o]] ?? "air") === "air" ? 0 : 255;
       }
     }
-    const c = document.createElement("canvas");
-    c.width = 16;
-    c.height = 16;
-    c.getContext("2d").putImageData(img, 0, 0);
-    t.image = c;
-    texCache.delete(t);
+    const r = regionOf(layer, t.cx, t.cz);
+    r.ctx.putImageData(img, (t.cx - r.rx * REGION) * 16, (t.cz - r.rz * REGION) * 16);
+    r.pending.delete(t);
   }
 
   // Stuecke mit Textur: zuletzt benutzte zuletzt (Map behaelt die Reihenfolge)
@@ -177,14 +250,14 @@ export function createMap(canvas, { onHover, onClick } = {}) {
     const img = new ImageData(W, W);
     const out = img.data;
     for (let i = 0; i < 256; i++) {
-      const col = t.cols[i];
+      const col = columnAt(t, t.bytes, i);
       const id = col.id.replace(/^minecraft:/, "");
-      const f = t.shade[i];
+      const f = t.shade[i] / 100;
       const bx = (i % 16) * S;
       const bz = Math.floor(i / 16) * S;
       const cell = id === "air" ? undefined : atlas.ids[id];
       // Unbekannter Block (fremdes Addon): seine Farbe, leicht gemasert
-      const flat = cell === undefined ? columnRgb(col) : undefined;
+      const flat = cell === undefined ? colorAt(t, i) : undefined;
       const kind = cell !== undefined ? atlas.tint[cell] : undefined;
       const tint = kind ? biomeTint(kind, col.biome) : undefined;
       const sx = cell !== undefined ? (cell % atlas.cols) * S : 0;
@@ -235,7 +308,7 @@ export function createMap(canvas, { onHover, onClick } = {}) {
       texCache.set(t, c);
       return c;
     }
-    if (budget.left <= 0) return undefined;
+    if (budget.left <= 0 || !t.shade) return undefined;
     budget.left--;
     c = textureTile(t);
     texCache.set(t, c);
@@ -243,25 +316,27 @@ export function createMap(canvas, { onHover, onClick } = {}) {
     return c;
   }
 
-  /** Neue oder geaenderte Kartenstuecke uebernehmen. */
+  /**
+   * Neue oder geaenderte Kartenstuecke uebernehmen. Hier wird nur entpackt - schattiert wird
+   * erst beim Zeichnen und nur, was zu sehen ist, ein paar hundert Stuecke je Bild.
+   */
   function addTiles(list, d = "minecraft:overworld") {
-    const tiles = tilesOf(d);
-    const touched = [];
+    const layer = layerOf(d);
+    let n = 0;
     for (const row of list) {
-      const cols = decodeTile(row);
-      if (cols.length !== 256) continue;
-      tiles.set(key(row.cx, row.cz), { cols, image: undefined, cx: row.cx, cz: row.cz });
-      touched.push([row.cx, row.cz]);
+      const bytes = tileBytes(row);
+      if (bytes.length < 256 * BYTES_PER_COLUMN) continue;
+      const t = { cx: row.cx, cz: row.cz, p: row.p, b: row.b, bytes, shade: undefined, edge: undefined };
+      layer.tiles.set(key(row.cx, row.cz), t);
+      // Das Stueck selbst, und die Nachbarn im Sueden und Osten (ihr Relief haengt an ihm)
+      queue(layer, t);
+      queue(layer, layer.tiles.get(key(row.cx, row.cz + 1)));
+      queue(layer, layer.tiles.get(key(row.cx + 1, row.cz)));
+      n++;
     }
-    // Das Stueck selbst, und die Nachbarn im Sueden und Osten (ihr Relief haengt an ihm)
-    for (const [cx, cz] of touched) {
-      shadeTile(d, cx, cz);
-      shadeTile(d, cx, cz + 1);
-      shadeTile(d, cx + 1, cz);
-    }
-    if (d === dim && !fitted.has(d) && tiles.size) fit();
+    if (d === dim && !fitted.has(d) && layer.tiles.size) fit();
     dirty = true;
-    return touched.length;
+    return n;
   }
 
   /** Auf die Mitte des Erkundeten setzen. */
@@ -290,6 +365,8 @@ export function createMap(canvas, { onHover, onClick } = {}) {
 
   function draw() {
     if (!dirty) return;
+    // Unsichtbar (eine andere Seite ist offen): spaeter zeichnen, wenn die Karte wieder da ist
+    if (!canvas.getClientRects().length) return;
     dirty = false;
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.width;
@@ -304,25 +381,49 @@ export function createMap(canvas, { onHover, onClick } = {}) {
     const cz0 = Math.floor(top / 16) - 1;
     const cx1 = Math.ceil((left + w / s) / 16);
     const cz1 = Math.ceil((top + h / s) / 16);
-    const tiles = tilesOf();
-    const textured = view.scale >= TEXTURE_SCALE;
-    if (textured && !atlas) loadAtlas(() => (dirty = true));
-    const budget = { left: TEXTURE_PER_FRAME };
-    for (let cz = cz0; cz <= cz1; cz++) {
-      for (let cx = cx0; cx <= cx1; cx++) {
-        const t = tiles.get(key(cx, cz));
-        if (!t?.image) continue;
-        const px = Math.floor((cx * 16 - left) * s);
-        const pz = Math.floor((cz * 16 - top) * s);
-        const size = Math.ceil(16 * s);
-        const tex = textured && atlas ? texturedImage(t, budget) : undefined;
-        // Verkleinerte Texturen glaetten (sonst flimmern sie), vergroesserte Bloecke scharf lassen
-        ctx.imageSmoothingEnabled = !!tex && size < tex.width;
-        ctx.drawImage(tex ?? t.image, px, pz, size, size);
+    const layer = layerOf();
+    // Erst die Regionen in Farbe - schattiert wird, was gerade zu sehen ist, mit Budget
+    const shading = { left: SHADE_PER_FRAME };
+    const span = REGION * 16;
+    for (let rz = Math.floor(cz0 / REGION); rz <= Math.floor(cz1 / REGION); rz++) {
+      for (let rx = Math.floor(cx0 / REGION); rx <= Math.floor(cx1 / REGION); rx++) {
+        const r = layer.regions.get(key(rx, rz));
+        if (!r) continue;
+        for (const t of r.pending) {
+          if (shading.left-- <= 0) break;
+          shadeTile(layer, t);
+        }
+        const px = Math.floor((rx * span - left) * s);
+        const pz = Math.floor((rz * span - top) * s);
+        const size = Math.ceil(span * s);
+        ctx.drawImage(r.canvas, px, pz, size, size);
       }
     }
-    // Noch nicht alle Texturen fertig - im naechsten Bild weiter
-    if (textured && atlas && budget.left <= 0) dirty = true;
+    // Noch nicht alles schattiert - im naechsten Bild weiter
+    if (shading.left < 0) dirty = true;
+    // Nah dran: darueber die echten Texturen (nur wenige Stuecke sind dann zu sehen)
+    const textured = view.scale >= TEXTURE_SCALE;
+    if (textured && !atlas) loadAtlas(() => (dirty = true));
+    if (textured && atlas) {
+      const budget = { left: TEXTURE_PER_FRAME };
+      for (let cz = cz0; cz <= cz1; cz++) {
+        for (let cx = cx0; cx <= cx1; cx++) {
+          const t = layer.tiles.get(key(cx, cz));
+          if (!t) continue;
+          const tex = texturedImage(t, budget);
+          if (!tex) continue;
+          const px = Math.floor((cx * 16 - left) * s);
+          const pz = Math.floor((cz * 16 - top) * s);
+          const size = Math.ceil(16 * s);
+          // Verkleinerte Texturen glaetten (sonst flimmern sie), vergroesserte Bloecke scharf lassen
+          ctx.imageSmoothingEnabled = size < tex.width;
+          ctx.drawImage(tex, px, pz, size, size);
+        }
+      }
+      ctx.imageSmoothingEnabled = false;
+      // Noch nicht alle Texturen fertig - im naechsten Bild weiter
+      if (budget.left <= 0) dirty = true;
+    }
     if (grid && view.scale >= 2) {
       ctx.strokeStyle = "rgba(0,0,0,0.25)";
       ctx.lineWidth = 1;
@@ -426,7 +527,7 @@ export function createMap(canvas, { onHover, onClick } = {}) {
   function inspect(x, z) {
     const t = tilesOf().get(key(Math.floor(x / 16), Math.floor(z / 16)));
     if (!t) return undefined;
-    return t.cols[(((z % 16) + 16) % 16) * 16 + (((x % 16) + 16) % 16)];
+    return columnAt(t, t.bytes, (((z % 16) + 16) % 16) * 16 + (((x % 16) + 16) % 16));
   }
 
   // Ein Klick ist, was sich kaum bewegt hat - sonst war es Verschieben

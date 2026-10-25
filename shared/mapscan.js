@@ -155,13 +155,27 @@ export function scanChunk(dimension, cx, cz, opt = {}) {
   return tile;
 }
 
+/** Die rohen Bytes eines Kartenstuecks - BYTES_PER_COLUMN je Saeule, 256 Saeulen. */
+export const tileBytes = (tile) => fromBase64(tile?.data);
+
+/**
+ * Eine Saeule aus den rohen Bytes. Die Webseite haelt nur die Bytes im Speicher und liest
+ * Saeulen erst, wenn sie sie braucht: 256 Objekte je Stueck mal zwanzigtausend Stuecke
+ * brachten den Browser ins Stocken.
+ * @param {{p?:string[], b?:string[]}} tile  Paletten des Stuecks
+ * @param {Uint8Array} bytes
+ * @param {number} i  Saeule 0..255 (z * 16 + x)
+ */
+export function columnAt(tile, bytes, i) {
+  const o = i * BYTES_PER_COLUMN;
+  return { id: tile.p?.[bytes[o]] ?? "air", y: bytes[o + 1] + bytes[o + 2] * 256 - 64, depth: bytes[o + 3], biome: tile.b?.[bytes[o + 4]] ?? "" };
+}
+
 /** Ein Kartenstueck lesen - fuer Tests und die Webseite. */
 export function decodeTile(tile) {
-  const bytes = fromBase64(tile?.data);
+  const bytes = tileBytes(tile);
   const cols = [];
-  for (let i = 0; i + BYTES_PER_COLUMN - 1 < bytes.length; i += BYTES_PER_COLUMN) {
-    cols.push({ id: tile.p?.[bytes[i]] ?? "air", y: bytes[i + 1] + bytes[i + 2] * 256 - 64, depth: bytes[i + 3], biome: tile.b?.[bytes[i + 4]] ?? "" });
-  }
+  for (let i = 0; (i + 1) * BYTES_PER_COLUMN <= bytes.length; i++) cols.push(columnAt(tile, bytes, i));
   return cols;
 }
 

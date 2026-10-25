@@ -161,7 +161,10 @@ function show() {
   document.title = t("web.nav." + page) + " · " + (serverName() || "Bedrock Essentials");
   renderNav();
   renderPage();
-  if (page === "map") window.dispatchEvent(new Event("resize"));
+  if (page === "map") {
+    window.dispatchEvent(new Event("resize"));
+    refreshTiles();
+  }
   window.scrollTo({ top: 0 });
 }
 
@@ -348,21 +351,38 @@ export function clearMapView() {
   state.snap = null;
 }
 
-async function refreshTiles() {
+/**
+ * Kartenstuecke nachladen - nur fuer die Karte, und je Dimension nur eine Abfrage zur Zeit.
+ *
+ * Geladen wird erst, wenn jemand die Karte oeffnet. Frueher holte jede Seite beim Start die
+ * ganze Karte (zwanzigtausend Stuecke, elf Abfragen) und fror dabei ein - auch wer nur in den
+ * Guide wollte.
+ */
+const tilesBusy = {};
+function refreshTiles() {
   const dim = map.dimension;
+  tilesBusy[dim] ??= loadTiles(dim).finally(() => delete tilesBusy[dim]);
+  return tilesBusy[dim];
+}
+
+async function loadTiles(dim) {
   try {
-    const rows = await source.tiles(dim, since[dim]);
-    if (rows.length) {
+    await source.tiles(dim, since[dim], (rows) => {
+      if (!rows.length) return;
       map.addTiles(rows, dim);
       since[dim] = rows.reduce((m, r) => (r.updated_at > m ? r.updated_at : m), since[dim] ?? "");
-    }
+      showTileCount();
+    });
   } catch {
     /* naechstes Mal */
   }
-  if (page === "map") {
-    $("map-info").textContent = map.size() ? t("web.map.tiles", map.size()) : "";
-    $("map-empty").hidden = map.size() > 0;
-  }
+  showTileCount();
+}
+
+function showTileCount() {
+  if (page !== "map") return;
+  $("map-info").textContent = map.size() ? t("web.map.tiles", map.size()) : "";
+  $("map-empty").hidden = map.size() > 0;
 }
 
 // ---------------------------------------------------------------- Daten
@@ -460,7 +480,6 @@ async function start() {
     show();
   });
   await refresh();
-  await refreshTiles();
   show();
   // Lokal oft; ueber Supabase sparsam (die Aufrufe zaehlen gegen ein kostenloses Kontingent,
   // das sich die Seite mit einem anderen Projekt teilt) - und gar nicht, solange der Tab im
@@ -470,12 +489,12 @@ async function start() {
   const visibleOnly = (fn) => () => fast || !document.hidden ? fn() : undefined;
   let ticks = 0;
   setInterval(visibleOnly(() => (fast || loggedIn() || ++ticks % 2 === 0) && refresh()), fast ? 3000 : 15000);
-  setInterval(visibleOnly(refreshTiles), fast ? 3000 : 60000);
+  setInterval(visibleOnly(() => page === "map" && refreshTiles()), fast ? 3000 : 60000);
   setInterval(renderStatus, 5000);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden && !fast) {
       refresh();
-      refreshTiles();
+      if (page === "map") refreshTiles();
     }
   });
 }

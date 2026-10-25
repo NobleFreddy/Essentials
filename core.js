@@ -104,26 +104,25 @@ const PAGE = 2000;
 const SOURCES = {
   local: {
     snapshot: () => getJson("api/snapshot"),
-    tiles: (dim, since) => getJson("api/tiles?dim=" + encodeURIComponent(dim) + (since ? "&since=" + encodeURIComponent(since) : "")),
+    tiles: async (dim, since, onPage) => onPage(await getJson("api/tiles?dim=" + encodeURIComponent(dim) + (since ? "&since=" + encodeURIComponent(since) : ""))),
   },
   demo: {
     snapshot: async () => ({ data: await getJson("demo/snapshot.json"), updated_at: new Date().toISOString() }),
-    tiles: async (dim, since) => (since || dim !== "minecraft:overworld" ? [] : getJson("demo/tiles.json")),
+    tiles: async (dim, since, onPage) => onPage(since || dim !== "minecraft:overworld" ? [] : await getJson("demo/tiles.json")),
   },
   supabase: {
     snapshot: () => getJson(fnUrl("what=snapshot")),
-    tiles: async (dim, since) => {
-      const out = [];
+    tiles: async (dim, since, onPage) => {
       let from = since;
       // Seitenweise: eine volle Seite heisst, es kommt noch mehr (eine Millisekunde Ueberlappung
-      // schadet nicht - gleiche Stuecke ueberschreiben sich nur)
+      // schadet nicht - gleiche Stuecke ueberschreiben sich nur). Jede Seite geht gleich an die
+      // Karte - so baut sie sich auf, waehrend der Rest noch laedt.
       for (let i = 0; i < 50; i++) {
         const page = await getJson(fnUrl("what=tiles&dim=" + encodeURIComponent(dim) + (from ? "&since=" + encodeURIComponent(from) : "")));
-        out.push(...page);
+        onPage(page);
         if (page.length < PAGE) break;
         from = new Date(Date.parse(page.at(-1).updated_at) - 1).toISOString();
       }
-      return out;
     },
   },
 };
@@ -142,7 +141,8 @@ export async function pickMode() {
 
 export const source = {
   snapshot: () => SOURCES[state.mode].snapshot(),
-  tiles: (dim, since) => SOURCES[state.mode].tiles(dim, since),
+  /** Kartenstuecke, seitenweise an onPage(rows) - eine grosse Karte kommt in mehreren Teilen. */
+  tiles: (dim, since, onPage) => SOURCES[state.mode].tiles(dim, since, onPage),
 };
 
 // ---------------------------------------------------------------- Anmeldung

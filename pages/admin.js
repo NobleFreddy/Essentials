@@ -128,10 +128,13 @@ function worldTab(a) {
       el(
         "div",
         "row",
-        el("span", "", plain(t(g.key === "nether" ? "legacy.gate.nether" : "legacy.gate.end"))),
+        el("span", "", plain(t(g.key === "nether" ? "legacy.gate.nether" : "legacy.gate.end")), el("small", "muted", " · " + t("web.admin.gates.need", g.need))),
         tabs(["auto", "open", "closed"].map((m) => [m, t("web.admin.gate." + m)]), g.mode, (m) => act("admin.gate", { dim: g.key, mode: m }, { after: refresh }))
       )
-    )
+    ),
+    // Erst ab Essentials 1.26.0 schickt der Server Uhr und Sperre mit - vorher gibt es hier nichts einzustellen
+    a.gateClock === undefined ? "" : el("p", "muted small", a.gatesOn === false ? t("web.admin.gates.off") : t("web.admin.gates.clock", a.gateClock)),
+    a.gateClock === undefined ? "" : el("div", "actions", button(t("web.admin.gates.settings"), () => gatesDialog(a), "ghost small", "settings"))
   );
   return [
     card(
@@ -379,6 +382,29 @@ async function votePlanDialog() {
   const at = new Date(v.at).getTime();
   if (!(at > Date.now())) return toast(t("web.admin.vote.past"), "bad");
   await act("admin.vote.plan", { at, every: Number(v.every) || 0 }, { okText: t("web.admin.vote.planned", dateTime(at), repeatLabel(Number(v.every) || 0)), after: refresh });
+}
+
+/** Sperre, Stunden und Uhr von Nether und End - wie im Menue der Spielleitung. */
+async function gatesDialog(a) {
+  const [nether, end] = ["nether", "end"].map((k) => a.gates.find((g) => g.key === k) ?? { need: 0, max: 1000 });
+  const v = await dialog({
+    title: t("web.admin.gates.settings"),
+    text: t("web.admin.gates.text"),
+    fields: [
+      { name: "on", label: t("web.admin.gates.on"), type: "checkbox", value: a.gatesOn !== false },
+      { name: "nether", label: t("web.admin.gates.nether"), type: "number", value: nether.need, min: 0, max: nether.max },
+      { name: "end", label: t("web.admin.gates.end"), type: "number", value: end.need, min: 0, max: end.max },
+      { name: "clock", label: t("web.admin.gates.clockset"), type: "number", value: a.gateClock ?? 0, min: 0, max: a.maxClock ?? 100000, step: 0.1, hint: t("web.admin.gates.clockhint") },
+    ],
+    ok: t("web.admin.gates.save"),
+  });
+  if (!v) return;
+  const hours = (x, max) => Math.max(0, Math.min(max, Math.round(Number(x) || 0)));
+  const args = { on: !!v.on, nether: hours(v.nether, nether.max), end: hours(v.end, end.max) };
+  // Die Uhr nur mitschicken, wenn sie verstellt wurde - sonst laeuft sie einfach weiter
+  const clock = Math.round(Math.max(0, Number(v.clock) || 0) * 10) / 10;
+  if (Math.abs(clock - (a.gateClock ?? 0)) >= 0.05) args.clock = clock;
+  await act("admin.gate.hours", args, { okText: t("web.admin.gates.saved"), after: refresh });
 }
 
 async function ltimeoutDialog(name = "", id) {

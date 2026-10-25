@@ -197,6 +197,7 @@ export function dialog({ title, text, fields = [], ok = t("web.ok"), danger = fa
         input.type = f.type ?? "text";
         if (f.min !== undefined) input.min = f.min;
         if (f.max !== undefined) input.max = f.max;
+        if (f.step !== undefined) input.step = f.step;
         if (f.list) {
           const dl = el("datalist");
           dl.id = id + "-list";
