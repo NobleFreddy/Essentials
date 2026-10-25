@@ -398,7 +398,7 @@ export const LEGACY = {
   ],
   roles: {
     traitor: [
-      "Muss sich ein **Ziel** festlegen. Nur dieses Ziel scheidet durch seine Hand endgültig aus – jeder andere Tod durch ihn ist eine gewöhnliche Auszeit. Wechseln geht jederzeit, aber der Bodyguard erfährt jedes neue Ziel.",
+      "Muss sich ein **Ziel** festlegen. Nur dieses Ziel scheidet durch seine Hand endgültig aus – jeder andere Tod durch ihn ist eine gewöhnliche Auszeit. Jedes Festlegen kostet **200 CP**; wechseln geht jederzeit, aber der Bodyguard erfährt jedes neue Ziel.",
       "**Todesstoß:** Sein erster Treffer gegen das Ziel ist tödlich – **{doomSeconds} Sekunden** später stirbt es in jedem Fall. Kein Totem und keine Phönixfeder retten, Weglaufen und Ausloggen auch nicht.",
       "Bestimmt gleich nach der Enthüllung seinen **Nachfolger** – einmal, nicht änderbar. Der weiß von nichts und wacht erst im nächsten Zyklus als Verräter auf.",
       "**Bestechung:** bietet {bribeDiamonds} Diamanten, die er nicht besitzen muss. Wer annimmt, kann nicht mehr gegen ihn stimmen. Nimmt der Bürgermeister an, übersteht der Verräter die nächste Abstimmung gegen ihn.",
