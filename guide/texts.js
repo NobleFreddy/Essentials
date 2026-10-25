@@ -399,6 +399,7 @@ export const LEGACY = {
   roles: {
     traitor: [
       "Muss sich ein **Ziel** festlegen. Nur dieses Ziel scheidet durch seine Hand endgültig aus – jeder andere Tod durch ihn ist eine gewöhnliche Auszeit. Wechseln geht jederzeit, aber der Bodyguard erfährt jedes neue Ziel.",
+      "**Todesstoß:** Sein erster Treffer gegen das Ziel ist tödlich – **{doomSeconds} Sekunden** später stirbt es in jedem Fall. Kein Totem und keine Phönixfeder retten, Weglaufen und Ausloggen auch nicht.",
       "Bestimmt gleich nach der Enthüllung seinen **Nachfolger** – einmal, nicht änderbar. Der weiß von nichts und wacht erst im nächsten Zyklus als Verräter auf.",
       "**Bestechung:** bietet {bribeDiamonds} Diamanten, die er nicht besitzen muss. Wer annimmt, kann nicht mehr gegen ihn stimmen. Nimmt der Bürgermeister an, übersteht der Verräter die nächste Abstimmung gegen ihn.",
       "**Phantomwandeln:** unsichtbar und unter fremdem Namen. Stirbt in dieser Zeit jemand durch ihn, steht im Totenbuch der falsche Name.",
@@ -425,6 +426,7 @@ export const LEGACY = {
     sheriff: [
       "Klagt einen Spieler an und hat dann **{sheriffMinutes} Minuten**, ihn **selbst zu töten**.",
       "Ist es der Verräter, scheidet der endgültig aus – keine Immunität hilft. Ist er es nicht, bekommt der Getötete seine gewöhnliche Auszeit, der Sheriff aber die **dreifache**.",
+      "**Todesstoß:** Sein erster Treffer gegen den Angeklagten ist tödlich – **{doomSeconds} Sekunden** später stirbt der in jedem Fall, an jedem Totem vorbei. Das Urteil gilt dann auch, wenn die Anklage bis dahin abgelaufen ist.",
     ],
     double_agent: [
       "Beginnt jeden Zyklus **unentschieden** und bekommt Aufträge von beiden Seiten – zur halben Belohnung.",
@@ -468,6 +470,7 @@ export const LEGACY = {
         "Gewöhnliche Tode (Monster, Sturz, Lava): die ersten {strikesFree} an einem Tag sind folgenlos, erst der **{deathStrikes}.** kostet **{timeoutHours} Stunden** Auszeit.",
         "Tod im **roten** Combat-Log: **{playerTimeoutHours} Stunden** Auszeit – auch wenn am Ende ein Monster den letzten Schlag setzt.",
         "Tod als **erklärtes Ziel** des Verräters: **ausgeschieden**.",
+        "**Todesstoß:** Trifft dich der Verräter als sein Ziel – oder der Sheriff, der dich angeklagt hat –, stirbst du **{doomSeconds} Sekunden** nach dem ersten Treffer. Totems helfen dagegen nicht.",
         "Auszeit heißt: Du kommst so lange nicht auf den Server. Ausloggen hilft nicht – der Combat-Log läuft weiter, während du weg bist.",
       ],
     },
