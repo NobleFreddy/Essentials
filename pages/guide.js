@@ -332,7 +332,7 @@ async function artifactsView() {
     t("web.guide.art.how.mimic", r.mimicEvery, P(r.mimicChance), r.mimicY[0], r.mimicY[1]),
     t("web.guide.art.how.limits", r.legendaryLimit),
     ...(r.rewindChance ? [t("web.guide.art.how.rewind", P(r.rewindChance))] : []),
-    t("web.guide.art.how.luck"),
+    t("web.guide.art.how.luck", r.luck, P(Math.min(100, r.mimicChance * r.luck)), r.mimicEvery),
     t("web.guide.art.how.enchant"),
   ];
 
@@ -345,7 +345,7 @@ async function artifactsView() {
   const luck = el("input");
   luck.type = "checkbox";
   luck.checked = lucky;
-  const luckLabel = el("label", "check", luck, t("web.guide.art.luck"));
+  const luckLabel = el("label", "check", luck, t("web.guide.art.luck", r.luck));
   const info = el("p", "muted small");
   const grid = el("div", "art-grid");
   const mobBody = el("tbody");
@@ -354,7 +354,7 @@ async function artifactsView() {
     const rows = [
       ...a.from.flatMap((s) => srcRow(lang(arts.mobs[s.mob]) + (s.boss ? " ★" : ""), lucky ? s.p2 : s.p)),
       ...(a.any ? srcRow(t(a.every ? "web.guide.art.everymonster" : "web.guide.art.anymonster"), lucky ? a.any2 : a.any) : []),
-      // Mimics geben immer eins - der Schal aendert daran nichts
+      // Mimics geben immer eins - der Schal aendert nur, wie oft einer kommt, nicht was drin ist
       ...(a.mimic ? srcRow(t("web.guide.art.mimic"), a.mimic) : []),
     ];
     return el(
