@@ -91,7 +91,10 @@ const KIND = { inhalt: "good", komfort: "", gemeinschaft: "warn", technik: "" };
 // ---------------------------------------------------------------- Seite
 export async function renderGuide() {
   const route = subRoute() || "overview";
-  const key = route + "|" + state.lang;
+  // Die Seite von Essentials rechnet mit den Artefakt-Regeln des Servers - aendern die sich,
+  // neu zeichnen. Sonst ist der Guide fest und bleibt stehen, wo man gerade liest.
+  const live = route === "addon/essentials" ?JSON.stringify(state.snap?.data?.artifacts ?? null) : "";
+  const key = route + "|" + state.lang + "|" + live;
   const page = $("page-guide");
   if (key === rendered && page.childElementCount) return;
   rendered = key;
@@ -311,6 +314,28 @@ async function legacyView() {
  */
 let arts;
 let lucky = false; // Schalter "mit Gluecksschal" - bleibt stehen, solange die Seite offen ist
+let shared; // Kopie von artifacts.js (web/shared) - erst geladen, wenn der Server seine Regeln meldet
+
+/**
+ * Die Weltregeln, die der Server meldet, ueber die Standardwerte gelegt - und die Chancen damit
+ * neu gerechnet, mit derselben Datei, mit der das Spiel wuerfelt. Ohne Meldung (aelterer Server,
+ * Modul aus) oder ohne die Datei bleiben die Standardwerte aus artifacts.json.
+ */
+async function liveArtifacts() {
+  const live = state.snap?.data?.artifacts;
+  if (!live?.on) return { r: arts.rules, list: arts.list };
+  shared ??= await import("../shared/artifacts.js").catch(() => undefined);
+  if (!shared?.guideOdds) return { r: arts.rules, list: arts.list };
+  const { on, ...set } = live;
+  const r = { ...arts.rules, ...set };
+  const odds = shared.guideOdds(r);
+  const list = arts.list.map((a) => {
+    const o = odds[a.id];
+    if (!o) return a;
+    return { ...a, from: a.from.map((s, i) => ({ ...s, p: o.from[i]?.p ?? 0, p2: o.from[i]?.p2 ?? 0 })), any: o.any, any2: o.any2, mimic: o.mimic };
+  });
+  return { r, list };
+}
 
 const chance = (x) => {
   const n = oneIn(x);
@@ -322,17 +347,21 @@ const slotName = (s) => t(s === "carried" ? "web.guide.art.carried" : "artifacts
 async function artifactsView() {
   arts ??= await getJson("guide/artifacts.json").catch(() => undefined);
   if (!arts) return [];
-  const r = arts.rules;
+  const { r, list } = await liveArtifacts();
   const P = (percent) => pct(percent / 100, state.lang);
+  const N = (n) => num(n, state.lang);
+  const specific = r.mobSpecific !== false;
   const how = [
+    ...(r.effects === false ? [t("web.guide.art.how.show")] : []),
     t("web.guide.art.how.slots"),
-    t("web.guide.art.how.own", P(r.common), P(r.uncommon), P(r.rare)),
-    t("web.guide.art.how.scatter", num(r.scatterShare, state.lang) + " %", P(r.scatterLegendary)),
+    t(specific ? "web.guide.art.how.own" : "web.guide.art.how.own.flat", P(r.common), P(r.uncommon), P(r.rare)),
+    // Den Streufund gibt es nur neben den Toepfen - ohne sie wuerfelt ohnehin jedes Monster um alles
+    ...(specific ? [t("web.guide.art.how.scatter", N(r.scatterShare) + " %", P(r.scatterLegendary))] : []),
     t("web.guide.art.how.boss", P(r.bossLegendary), P(r.bossLegendary * (r.bossShare?.ravager ?? 0.5))),
-    t("web.guide.art.how.mimic", r.mimicEvery, P(r.mimicChance), r.mimicY[0], r.mimicY[1]),
-    t("web.guide.art.how.limits", r.legendaryLimit),
+    r.mimics === false ? t("web.guide.art.how.mimic.off") : t("web.guide.art.how.mimic", r.mimicEvery, P(r.mimicChance), r.mimicY[0], r.mimicY[1]),
+    t(r.keepOnDeath ? "web.guide.art.how.limits.keep" : "web.guide.art.how.limits", r.legendaryLimit),
     ...(r.rewindChance ? [t("web.guide.art.how.rewind", P(r.rewindChance))] : []),
-    t("web.guide.art.how.luck", r.luck, P(Math.min(100, r.mimicChance * r.luck)), r.mimicEvery),
+    t("web.guide.art.how.luck", N(r.luckFind), N(r.luckWatch), N(r.luckMimic), P(Math.min(100, r.mimicChance * r.luckMimic)), r.mimicEvery),
     t("web.guide.art.how.enchant"),
   ];
 
@@ -345,7 +374,7 @@ async function artifactsView() {
   const luck = el("input");
   luck.type = "checkbox";
   luck.checked = lucky;
-  const luckLabel = el("label", "check", luck, t("web.guide.art.luck", r.luck));
+  const luckLabel = el("label", "check", luck, t("web.guide.art.luck", N(r.luckFind)));
   const info = el("p", "muted small");
   const grid = el("div", "art-grid");
   const mobBody = el("tbody");
@@ -381,7 +410,7 @@ async function artifactsView() {
   const draw = () => {
     lucky = luck.checked;
     const q = search.value.trim().toLowerCase();
-    const shown = arts.list.filter(
+    const shown = list.filter(
       (a) =>
         (!slotSel.value || a.slot === slotSel.value) &&
         (!raritySel.value || a.rarity === raritySel.value) &&
@@ -391,7 +420,7 @@ async function artifactsView() {
     grid.replaceChildren(...(shown.length ? shown.map(card) : [el("p", "empty", t("web.guide.art.none"))]));
     // Nach Monster: dieselben Zahlen, andersherum gelesen
     const byMob = new Map();
-    for (const a of arts.list) for (const s of a.from) byMob.set(s.mob, [...(byMob.get(s.mob) ?? []), [a, s]]);
+    for (const a of list) for (const s of a.from) byMob.set(s.mob, [...(byMob.get(s.mob) ?? []), [a, s]]);
     mobBody.replaceChildren(
       ...[...byMob].map(([mob, list]) =>
         el(

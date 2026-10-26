@@ -1039,6 +1039,31 @@ input.code {
   text-align: center;
 }
 
+/* Weltregeln der Artefakte (Verwaltung) */
+.art-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0 1.5rem;
+}
+.art-rules {
+  display: grid;
+  gap: 0.55rem;
+  align-content: start;
+  margin-top: 0.9rem;
+}
+.art-rules h4 {
+  margin: 0;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.art-rules .field > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 /* Schalter */
 .switches {
   display: grid;
