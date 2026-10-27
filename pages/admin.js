@@ -3,11 +3,11 @@
  * Karte), Web-Zugaenge und das Protokoll. Jede Aktion prueft das Addon noch einmal.
  */
 import { state, t, resetWebsite, reasonText } from "../core.js";
-import { el, $, ago, dateTime, empty, button, act, dialog, confirmDialog, tabs, head, avatar, toast } from "../ui.js";
+import { el, $, ago, dateTime, empty, button, act, dialog, confirmDialog, tabs, head, avatar, toast, switchRow } from "../ui.js";
 import { plain, fill } from "../rawtext.js";
 import { refresh, go, clearMapView } from "../app.js";
 import { playerNames } from "./public.js";
-import { num } from "../guide/odds.js";
+import { rulesTab } from "./admin_rules.js";
 
 const B = () => state.me?.bundle ?? null;
 const card = (title, iconName, ...body) => el("section", "card", head(title, iconName), ...body);
@@ -44,6 +44,7 @@ export function renderAdmin() {
       ["players", t("web.admin.tab.players"), all.filter(flagged).length],
       ["world", t("web.admin.tab.world")],
       ["settings", t("web.admin.tab.settings")],
+      ["rules", t("web.admin.tab.rules")],
       ["web", t("web.admin.tab.web")],
       ["log", t("web.admin.tab.log")],
     ],
@@ -53,7 +54,7 @@ export function renderAdmin() {
       renderAdmin();
     }
   );
-  const body = { players: playersTab, world: worldTab, settings: settingsTab, web: webTab, log: logTab }[adminTab](a, all);
+  const body = { players: playersTab, world: worldTab, settings: settingsTab, rules: rulesTab, web: webTab, log: logTab }[adminTab](a, all);
   $("page-admin").replaceChildren(el("div", "grid", el("div", "wide", bar), ...body));
 }
 
@@ -169,63 +170,6 @@ function worldTab(a) {
   ];
 }
 
-/** Ein Schalter, der sofort einen Befehl schickt. */
-function switchRow(label, hint, on, disabled, onChange) {
-  const box = el("input");
-  box.type = "checkbox";
-  box.checked = !!on;
-  box.disabled = !!disabled;
-  box.addEventListener("change", () => onChange(box.checked));
-  return el("label", "switch-row" + (disabled ? " disabled" : ""), el("span", "", el("b", "", label), hint ? el("small", "muted", hint) : ""), el("span", "switch", box, el("i")));
-}
-
-// Was in den Artefakt-Regeln verstellt, aber noch nicht gespeichert ist - uebersteht das
-// Neuzeichnen der Seite, bis jemand speichert
-let artDraft = {};
-
-/** Weltregeln der Artefakte: dieselbe Tabelle wie das Menue im Spiel (rules.js), ein Knopf speichert. */
-function artifactsCard(list) {
-  const save = button(
-    t("web.admin.art.save"),
-    async () => {
-      const res = await act("admin.artifacts", { rules: { ...artDraft } }, { okText: t("web.admin.art.saved") });
-      if (res.state === "done" || res.state === "queued") artDraft = {};
-      await refresh(true);
-    },
-    "small"
-  );
-  const mark = (s, value) => {
-    if (value === s.value) delete artDraft[s.key];
-    else artDraft[s.key] = value;
-    save.disabled = !Object.keys(artDraft).length;
-  };
-  const row = (s) => {
-    const value = s.key in artDraft ? artDraft[s.key] : s.value;
-    const label = plain(t("artifacts.rule." + s.key));
-    if (s.min === undefined) return switchRow(label, "", value, false, (on) => mark(s, on));
-    const input = el("input");
-    input.type = "range";
-    Object.assign(input, { min: s.min, max: s.max, step: s.step, value });
-    const shown = el("b", "", num(value, state.lang));
-    input.addEventListener("input", () => {
-      const v = Number(input.value);
-      shown.textContent = num(v, state.lang);
-      mark(s, v);
-    });
-    return el("label", "field", el("span", "", el("span", "", label), shown), input);
-  };
-  save.disabled = !Object.keys(artDraft).length;
-  const groups = [...new Set(list.map((s) => s.group))];
-  return el(
-    "section",
-    "card wide",
-    head(t("web.admin.art"), "gift"),
-    el("p", "muted small", t("web.admin.art.text")),
-    el("div", "art-rules-grid", ...groups.map((g) => el("div", "art-rules", el("h4", "", t("web.admin.art.group." + g)), ...list.filter((s) => s.group === g).map(row)))),
-    el("div", "actions", save)
-  );
-}
-
 function settingsTab(a) {
   const modules = (a.modules ?? []).map((m) =>
     switchRow(plain(t(m.key)), m.locked ? t("web.admin.module.locked") : "", m.on, m.locked, (on) => act("admin.module", { id: m.id, on }, { after: refresh }))
@@ -249,8 +193,6 @@ function settingsTab(a) {
       el("label", "field", el("span", "", t("web.admin.mapcfg.radius"), " ", radiusLabel), radius)
     ),
     card(t("web.info"), "info", el("p", "muted small", t("web.admin.info.text")), el("div", "actions", button(t("web.info.edit"), () => go("info"), "ghost small"))),
-    // Erst ab Essentials 1.28 im Paket - ein aelterer Server kennt den Befehl nicht
-    a.artifacts?.length ? artifactsCard(a.artifacts) : "",
   ];
 }
 

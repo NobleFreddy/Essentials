@@ -109,6 +109,16 @@ export function tabs(list, current, onPick) {
   );
 }
 
+/** Ein Schalter in einer Zeile mit Beschriftung; onChange bekommt den neuen Stand. */
+export function switchRow(label, hint, on, disabled, onChange) {
+  const box = el("input");
+  box.type = "checkbox";
+  box.checked = !!on;
+  box.disabled = !!disabled;
+  box.addEventListener("change", () => onChange(box.checked));
+  return el("label", "switch-row" + (disabled ? " disabled" : ""), el("span", "", el("b", "", label), hint ? el("small", "muted", hint) : ""), el("span", "switch", box, el("i")));
+}
+
 /** Ueberschrift eines Kastens mit Symbol und optionalen Knoepfen rechts. */
 export const head = (title, iconName, ...right) => el("div", "card-head", el("h2", "", iconName ? icon(iconName) : "", title), right.length ? el("div", "actions", ...right) : "");
 

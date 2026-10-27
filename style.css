@@ -1064,6 +1064,92 @@ input.code {
   gap: 1rem;
 }
 
+/* Weltregeln je Modul: zum Aufklappen */
+.set-card > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  list-style: none;
+}
+.set-card > summary::-webkit-details-marker {
+  display: none;
+}
+.set-card > summary::before {
+  content: "▸";
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+.set-card[open] > summary::before {
+  transform: rotate(90deg);
+}
+.set-card > summary h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.set-card > summary .badge:empty {
+  display: none;
+}
+.set-card > .actions {
+  margin-top: 0.9rem;
+}
+.set-multi {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+}
+
+/* Einzelne Artefakt-Chancen */
+.odds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+.odds-card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-solid);
+}
+.odds-card .art-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.2rem;
+}
+.odds-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+}
+.odds-row > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.odds-in {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: none;
+}
+.odds-in input {
+  width: 6.5rem;
+  padding: 0.25rem 0.4rem;
+}
+.odds-row.fixed input {
+  border-color: var(--accent);
+}
+.odds-row.changed > span:first-child {
+  font-weight: 600;
+}
+
 /* Schalter */
 .switches {
   display: grid;

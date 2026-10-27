@@ -312,9 +312,18 @@ export function randomArtifact(rand = Math.random, pool) {
  *                          scatterLegendary, bossLegendary, mobSpecific
  * @param {()=>number} rand
  * @param {number} luck     Faktor auf alle Chancen (Gluecksschal = LUCK)
+ * @param {object} [odds]   feste Chancen des Operators (siehe findTable)
  * @returns {{rarity:string, pool:string[], scattered:boolean}|undefined}
  */
-export function rollFind(mob, chances, rand = Math.random, luck = 1) {
+export function rollFind(mob, chances, rand = Math.random, luck = 1, odds) {
+  // Hat der Operator feste Chancen gesetzt, zieht der Wurf aus der fertigen Tabelle - ohne
+  // ist sie genau diese Rechnung (killOdds), also wuerfelt alles wie zuvor
+  if (hasKillOdds(odds)) {
+    const id = pickFromTable(findTable(mob, chances, luck, odds), rand);
+    const artifact = id && artifactById(id);
+    if (!artifact) return undefined;
+    return { rarity: artifact.rarity, pool: [id], scattered: chances?.mobSpecific !== false && !dropsOf(mob).includes(id) };
+  }
   const factor = Number(luck) || 0;
   const hit = (percent) => percent > 0 && rand() * 100 < percent * factor;
   // Ohne mobSpecific gibt es keine Toepfe: jedes Monster wuerfelt gegen alle 40
@@ -396,20 +405,111 @@ export function mimicOdds() {
   return out;
 }
 
+// ---------------------------------------------------------------- Feste Chancen des Operators
 /**
- * Fundchancen fuer den Server-Guide der Webseite: je Artefakt und Fundort die Wahrscheinlichkeit
- * pro Kill, ohne und mit Gluecksschal, dazu "jedes andere Monster" und Mimic. Die Webseite
- * rechnet damit die Weltregeln nach, die der Server meldet - eine Kopie dieser Datei liegt
- * unter web/shared/.
- *
- * @param {object} rules  wie publicRules() in store.js: common, uncommon, rare, scatterShare,
- *                        scatterLegendary, bossLegendary, mobSpecific, mimics, rewindChance,
- *                        luckFind, luckWatch - was fehlt, hat den Standardwert
- * @returns {Object<string, {from: {mob: string, p: number, p2: number}[], any: number, any2: number, mimic: number}>}
+ * Feste Chancen je Fundort: der Operator legt fuer ein Artefakt genau fest, wie oft es faellt -
+ * je Monster aus seinem Topf, fuer "jedes andere Monster" und im Mimic. Gespeichert als
+ * "<Fundort>|<Artefakt>" -> Prozent; was nicht fest ist, rechnet weiter ueber die Stufen.
+ *   minecraft:pillager|lucky_scarf   je Kill eines Pluenderers
+ *   *|lucky_scarf                    je Kill jedes Monsters, das es nicht im eigenen Topf hat
+ *   mimic|lucky_scarf                Anteil in einem Mimic (die uebrigen teilen sich den Rest)
  */
-export function guideOdds(rules = {}) {
-  const pick = (key, fallback) => (typeof rules?.[key] === "number" && Number.isFinite(rules[key]) ? rules[key] : fallback);
-  const chances = {
+export const ANY_MOB = "*";
+export const MIMIC_SOURCE = "mimic";
+export const oddsKey = (source, id) => source + "|" + id;
+
+/** Gibt es diesen Fundort fuer dieses Artefakt? Ein Monster nur, wenn es in seinem Topf steht. */
+export function validOddsKey(key) {
+  const parts = String(key).split("|");
+  if (parts.length !== 2 || !droppable().some((a) => a.id === parts[1])) return false;
+  return parts[0] === ANY_MOB || parts[0] === MIMIC_SOURCE || dropsOf(parts[0]).includes(parts[1]);
+}
+
+/**
+ * Aenderungen pruefen: Prozent von 0 bis 100, null nimmt einen festen Wert wieder heraus.
+ * Alles oder nichts - ein falscher Fundort oder Wert, und nichts gilt.
+ * @returns {Object<string, number|null>|undefined}
+ */
+export function checkOdds(changes) {
+  if (!changes || typeof changes !== "object" || Array.isArray(changes)) return undefined;
+  const out = {};
+  for (const [key, v] of Object.entries(changes)) {
+    if (!validOddsKey(key)) return undefined;
+    if (v === null) out[key] = null;
+    else if (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 100) out[key] = Number(v.toPrecision(6));
+    else return undefined;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+const fixedOf = (odds, key) => (typeof odds?.[key] === "number" && Number.isFinite(odds[key]) ? Math.min(100, Math.max(0, odds[key])) / 100 : undefined);
+const hasOdds = (odds, mimic) => !!odds && Object.keys(odds).some((k) => k.startsWith(MIMIC_SOURCE + "|") === mimic && fixedOf(odds, k) !== undefined);
+export const hasKillOdds = (odds) => hasOdds(odds, false);
+export const hasMimicOdds = (odds) => hasOdds(odds, true);
+
+/** Aus einer Tabelle (Artefakt -> Wahrscheinlichkeit) ziehen: eins oder - im Rest bis 1 - keins. */
+export function pickFromTable(table, rand = Math.random) {
+  let roll = rand();
+  for (const [id, p] of Object.entries(table)) {
+    if (roll < p) return id;
+    roll -= p;
+  }
+  return undefined;
+}
+
+/**
+ * Was bei einem Kill faellt, als Tabelle: je Artefakt die Wahrscheinlichkeit (0..1), zusammen
+ * hoechstens eins. Grundlage ist killOdds() - genau die Rechnung der Stufen -, darueber liegen
+ * die festen Chancen, mal dem Gluecksschal. Zusammen ueber 100 %: anteilig gekuerzt.
+ */
+export function findTable(mob, chances, luck = 1, odds) {
+  const out = killOdds(mob, chances, luck);
+  if (!hasKillOdds(odds)) return out;
+  const factor = Number(luck) || 0;
+  const own = chances?.mobSpecific !== false ? dropsOf(mob) : [];
+  for (const a of droppable()) {
+    const fixed = fixedOf(odds, oddsKey(mob, a.id)) ?? (own.includes(a.id) ? undefined : fixedOf(odds, oddsKey(ANY_MOB, a.id)));
+    if (fixed === undefined) continue;
+    const p = Math.min(1, fixed * factor);
+    if (p > 0) out[a.id] = p;
+    else delete out[a.id];
+  }
+  const sum = Object.values(out).reduce((n, p) => n + p, 0);
+  if (sum > 1) for (const id of Object.keys(out)) out[id] /= sum;
+  return out;
+}
+
+/**
+ * Was in einem Mimic steckt (zusammen genau 1): mimicOdds(), darueber die festen Anteile - die
+ * uebrigen teilen sich, was dann noch bleibt, im alten Verhaeltnis.
+ */
+export function mimicTable(odds) {
+  const base = mimicOdds();
+  if (!hasMimicOdds(odds)) return base;
+  const fixed = {};
+  for (const a of droppable()) {
+    const f = fixedOf(odds, oddsKey(MIMIC_SOURCE, a.id));
+    if (f !== undefined) fixed[a.id] = f;
+  }
+  const fixedSum = Object.values(fixed).reduce((n, p) => n + p, 0);
+  const restIds = Object.keys(base).filter((id) => !(id in fixed));
+  const restBase = restIds.reduce((n, id) => n + base[id], 0);
+  const rest = Math.max(0, 1 - fixedSum);
+  const out = {};
+  if (restBase > 0) for (const id of restIds) if (rest > 0) out[id] = (base[id] / restBase) * rest;
+  for (const [id, p] of Object.entries(fixed)) if (p > 0) out[id] = p;
+  // Ein Mimic gibt immer genau eins
+  const sum = Object.values(out).reduce((n, p) => n + p, 0);
+  if (sum > 0) for (const id of Object.keys(out)) out[id] /= sum;
+  return out;
+}
+
+const pickOf = (rules) => (key, fallback) => (typeof rules?.[key] === "number" && Number.isFinite(rules[key]) ? rules[key] : fallback);
+
+/** Die Fundchancen der Stufen (wie chancesOf in store.js) aus Regeln in der Form von publicRules(). */
+export function chancesFrom(rules = {}) {
+  const pick = pickOf(rules);
+  return {
     common: pick("common", DROP_CHANCES.common),
     uncommon: pick("uncommon", DROP_CHANCES.uncommon),
     rare: pick("rare", DROP_CHANCES.rare),
@@ -418,23 +518,64 @@ export function guideOdds(rules = {}) {
     bossLegendary: pick("bossLegendary", BOSS_LEGENDARY),
     mobSpecific: rules?.mobSpecific !== false,
   };
+}
+
+/**
+ * Die Liste fuer den Operator: je Artefakt seine Fundorte, jeder mit dem gerechneten Wert (ohne
+ * feste Chancen, ohne Schal) und dem festen, falls es einen gibt - in Prozent. Das Menue im
+ * Spiel und die Verwaltung der Webseite zeigen damit dasselbe.
+ * @returns {{id:string, rows:{key:string, source:string, calc:number, fixed:number|undefined}[]}[]}
+ */
+export function oddsSheet(rules = {}, odds = {}) {
+  const chances = chancesFrom(rules);
+  const cache = new Map();
+  const base = (mob) => {
+    if (!cache.has(mob)) cache.set(mob, killOdds(mob, chances, 1));
+    return cache.get(mob);
+  };
+  const mimic = mimicOdds();
+  const row = (source, id, p) => {
+    const key = oddsKey(source, id);
+    return { key, source, calc: (p ?? 0) * 100, fixed: typeof odds?.[key] === "number" ? odds[key] : undefined };
+  };
+  return droppable().map((a) => ({
+    id: a.id,
+    rows: [...sourcesOf(a.id).map((mob) => row(mob, a.id, base(mob)[a.id])), row(ANY_MOB, a.id, base("")[a.id]), row(MIMIC_SOURCE, a.id, mimic[a.id])],
+  }));
+}
+
+/**
+ * Fundchancen fuer den Server-Guide der Webseite: je Artefakt und Fundort die Wahrscheinlichkeit
+ * pro Kill, ohne und mit Gluecksschal, dazu "jedes andere Monster" und Mimic. Die Webseite
+ * rechnet damit die Weltregeln nach, die der Server meldet - eine Kopie dieser Datei liegt
+ * unter web/shared/.
+ *
+ * @param {object} rules  wie publicRules() in store.js: common, uncommon, rare, scatterShare,
+ *                        scatterLegendary, bossLegendary, mobSpecific, mimics, rewindChance,
+ *                        luckFind, luckWatch, odds - was fehlt, hat den Standardwert
+ * @returns {Object<string, {from: {mob: string, p: number, p2: number}[], any: number, any2: number, mimic: number}>}
+ */
+export function guideOdds(rules = {}) {
+  const pick = pickOf(rules);
+  const chances = chancesFrom(rules);
+  const fixed = rules?.odds;
   const luck = Math.max(1, pick("luckFind", LUCK));
   const luckWatch = Math.max(1, pick("luckWatch", LUCK));
   const watch = pick("rewindChance", REWIND_CHANCE);
   const cache = new Map();
-  const odds = (mob, factor) => {
+  const table = (mob, factor) => {
     const key = mob + "|" + factor;
-    if (!cache.has(key)) cache.set(key, killOdds(mob, chances, factor));
+    if (!cache.has(key)) cache.set(key, findTable(mob, chances, factor, fixed));
     return cache.get(key);
   };
-  const mimic = rules?.mimics === false ? {} : mimicOdds();
+  const mimic = rules?.mimics === false ? {} : mimicTable(fixed);
   const out = {};
   for (const a of ARTIFACTS) {
     out[a.id] = {
-      from: sourcesOf(a.id).map((mob) => ({ mob, p: odds(mob, 1)[a.id] ?? 0, p2: odds(mob, luck)[a.id] ?? 0 })),
+      from: sourcesOf(a.id).map((mob) => ({ mob, p: table(mob, 1)[a.id] ?? 0, p2: table(mob, luck)[a.id] ?? 0 })),
       // Die Rueckspuluhr hat keinen Topf, sondern ihren eigenen Wurf bei jedem Monster
-      any: a.everywhere ? rewindOdds(watch, 1) : (odds("", 1)[a.id] ?? 0),
-      any2: a.everywhere ? rewindOdds(watch, luckWatch) : (odds("", luck)[a.id] ?? 0),
+      any: a.everywhere ? rewindOdds(watch, 1) : (table("", 1)[a.id] ?? 0),
+      any2: a.everywhere ? rewindOdds(watch, luckWatch) : (table("", luck)[a.id] ?? 0),
       mimic: mimic[a.id] ?? 0,
     };
   }
